@@ -1,0 +1,75 @@
+Attached Element Context from Integrated Browser
+
+Element: div.min-h-dvh.bg-sand-100
+
+URL: http://localhost:3000/login
+
+HTML Path: div#main > div.min-h-dvh.bg-sand-100
+
+Outer HTML:
+```html
+<div class="min-h-dvh bg-sand-100"><div class="mx-auto w-full max-w-xl px-6 py-12 sm:py-20"><header class="text-center"><span class="inline-flex size-12 items-center justify-center rounded-md bg-primary font-display text-lg font-bold text-sand-50">DA</span><h1 class="mt-4 font-display text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">Dev Arena</h1><p class="mx-auto mt-3 max-w-md text-base leading-relaxed text-ink-500">Solve real problems, present topics, and find opportunities. XP is awarded when the instructor approves your work.</p></header><ol class="mt-8 grid gap-3 sm:grid-cols-3"><li class="rounded-md border border-sand-400 bg-sand-50 p-4"><div class="flex items-center gap-2 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-target size-4" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg><span class="font-mono text-[10px] uppercase tracking-[0.14em]">Pick a problem</span></div><p class="mt-1 text-xs text-ink-400">Claim it, solve it.</p></li><li class="rounded-md border border-sand-400 bg-sand-50 p-4"><div class="flex items-center gap-2 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trophy size-4" aria-hidden="true"><path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978"></path><path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978"></path><path d="M18 9h1.5a1 1 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"></path><path d="M6 9H4.5a1 1 0 0 1 0-5H6"></path></svg><span class="font-mono text-[10px] uppercase tracking-[0.14em]">Submit evidence</span></div><p class="mt-1 text-xs text-ink-400">The instructor reviews.</p></li><li class="rounded-md border border-sand-400 bg-sand-50 p-4"><div class="flex items-center gap-2 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-building2 lucide-building-2 size-4" aria-hidden="true"><path d="M10 12h4"></path><path d="M10 8h4"></path><path d="M14 21v-3a2 2 0 0 0-4 0v3"></path><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"></path><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"></path></svg><span class="font-mono text-[10px] uppercase tracking-[0.14em]">Earn XP</span></div><p class="mt-1 text-xs text-ink-400">Approval pays, never a tap.</p></li></ol><section class="mt-10 rounded-lg border border-sand-300 bg-sand-50 p-6 shadow-subtle sm:p-8"><div class="grid grid-cols-2 gap-2" role="tablist" aria-label="Authentication mode"><button type="button" role="tab" aria-selected="true" class="rounded-md px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors bg-ink-900 text-sand-50">Log in</button><button type="button" role="tab" aria-selected="false" class="rounded-md px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors text-ink-400 hover:bg-sand-200 hover:text-ink-700">Create account</button></div><form class="mt-6 space-y-4" action="javascript:throw new Error('React form unexpectedly submitted.')"><div class="space-y-1.5"><label class="eyebrow mb-1.5 block text-ink-500" for="email">Email</label><input class="w-full rounded-md border border-sand-400 bg-sand-50 px-3 py-2 text-sm text-ink-800 transition-colors duration-150 placeholder:text-ink-300 hover:border-ink-300 focus:border-secondary focus:outline-none disabled:opacity-50 h-10" id="email" type="email" autocomplete="email" required="" placeholder="you@example.com" name="email"></div><div class="space-y-1.5"><label class="eyebrow mb-1.5 block text-ink-500" for="password">Password</label><input class="w-full rounded-md border border-sand-400 bg-sand-50 px-3 py-2 text-sm text-ink-800 transition-colors duration-150 placeholder:text-ink-300 hover:border-ink-300 focus:border-secondary focus:outline-none disabled:opacity-50 h-10" id="password" type="password" autocomplete="current-password" required="" minlength="6" placeholder="At least 6 characters" name="password"></div><input type="hidden" name="role" value="developer"><button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-[background-color,color,border-color,box-shadow,transform] duration-150 ease-out disabled:pointer-events-none disabled:opacity-45 active:translate-y-px [&amp;_svg]:shrink-0 bg-primary text-sand-50 shadow-subtle hover:bg-primary-strong hover:shadow-raised h-12 px-6 text-sm [&amp;_svg]:size-[18px] w-full">Log in<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right size-4" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></button></form></section></div></div>
+```
+
+Dimensions:
+- top: 0px
+- left: 0px
+- width: 1047px
+- height: 803px
+
+CSS:
+```css
+*, :after, :before, ::backdrop { box-sizing: border-box;
+    border: 0 solid;
+    margin: 0;
+    padding: 0; }
+* { scrollbar-width: thin;
+    scrollbar-color: var(--color-sand-400) transparent; }
+.min-h-dvh { min-height: 100dvh; }
+.bg-sand-100 { background-color: var(--color-sand-100); }
+
+/* Pseudo-elements */
+::selection { background-color: #db955866; }
+::selection { background-color: color-mix(in oklab, var(--color-secondary) 40%, transparent); }
+::selection { color: var(--color-ink-950); }
+::-webkit-scrollbar { width: 10px;
+    height: 10px; }
+::-webkit-scrollbar-thumb { background-color: var(--color-sand-400);
+    background-clip: content-box;
+    border: 3px solid #0000;
+    border-radius: 999px; }
+
+/* Inherited */
+body { color: var(--color-ink-800); font-family: var(--font-sans); font-feature-settings: "cv02", "cv03", "cv04", "cv11" }
+html, :host { tab-size: 4; line-height: 1.5; font-family: var(--default-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"); font-feature-settings: var(--default-font-feature-settings, normal) }
+
+/* Resolved values */
+margin: 0px;
+padding: 0px;
+border-radius: 0px;
+border: 0px solid rgb(36, 27, 18);
+background-clip: border-box;
+background-color: rgb(252, 249, 234);
+box-sizing: border-box;
+color: rgb(36, 27, 18);
+display: block;
+font-family: Geist, "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+height: 802.5px;
+line-height: 24px;
+min-height: 681px;
+scrollbar-color: rgb(224, 214, 186) rgba(0, 0, 0, 0);
+scrollbar-width: thin;
+tab-size: 4;
+unicode-bidi: isolate /*UA*/;
+width: 1047px;
+
+/* CSS variables */
+--color-ink-950: #0f0b07;
+--color-sand-400: #e0d6ba;
+--color-secondary: #db9558;
+--color-sand-100: #fcf9ea;
+--font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+--default-font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+--color-ink-800: #241b12;
+```
