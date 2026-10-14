@@ -3,6 +3,7 @@ import { Store } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/section-heading";
 import { DevShopRequestReview } from "@/components/instructor/dev-shop-request-review";
+import { DevShopRewardManager } from "@/components/instructor/dev-shop-reward-manager";
 import { createClient } from "@/lib/supabase/server";
 import { requireInstructor } from "@/lib/arena/session";
 
@@ -14,15 +15,27 @@ export const metadata: Metadata = {
 export default async function InstructorDevShopPage() {
   await requireInstructor();
   const supabase = await createClient();
-  const { data: redemptions, error } = await supabase
-    .from("dev_shop_redemptions")
-    .select(
-      "id, developer_id, reward_name, points_cost, request_note, status, instructor_note, created_at, updated_at",
-    )
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const [redemptionsResult, rewardsResult] = await Promise.all([
+    supabase
+      .from("dev_shop_redemptions")
+      .select(
+        "id, developer_id, reward_name, points_cost, request_note, status, instructor_note, created_at, updated_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("dev_shop_rewards")
+      .select("id, name, category, description, details, points_cost, active, sort_order")
+      .order("sort_order"),
+  ]);
 
-  if (error) throw new Error(`Could not load Dev Shop requests: ${error.message}`);
+  if (redemptionsResult.error) {
+    throw new Error(`Could not load Dev Shop requests: ${redemptionsResult.error.message}`);
+  }
+  if (rewardsResult.error) {
+    throw new Error(`Could not load Dev Shop rewards: ${rewardsResult.error.message}`);
+  }
+  const redemptions = redemptionsResult.data;
 
   const developerIds = [...new Set(redemptions.map((redemption) => redemption.developer_id))];
   const { data: profiles, error: profilesError } = developerIds.length
@@ -42,8 +55,10 @@ export default async function InstructorDevShopPage() {
       <PageHeader
         eyebrow="Instructor workspace"
         title="Dev Shop requests"
-        description="Review reward requests, coordinate sessions or resources, and mark them fulfilled. Declining a request returns its Dev Points to the developer."
+        description="Manage rewards and their point prices, then review requests, coordinate sessions or resources, and mark them fulfilled. Declining a request returns its Dev Points to the developer."
       />
+
+      <DevShopRewardManager rewards={rewardsResult.data} />
 
       <section className="mt-8">
         <h2 className="font-display text-lg font-semibold text-ink-900">Recent requests</h2>

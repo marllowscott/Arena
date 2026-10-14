@@ -57,13 +57,16 @@ export async function requireSession(): Promise<ArenaSession> {
   return session;
 }
 
-/** The existing 0001 mechanism: a reviews-scope unlock marks the instructor. */
+/** Check the database-assigned role used by RLS and instructor operations. */
 export async function isInstructor(userId: string): Promise<boolean> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("is_instructor", {
     p_user_id: userId,
   });
-  return !error && data === true;
+  if (error) {
+    throw new Error(`Could not verify instructor access: ${error.message}`);
+  }
+  return data === true;
 }
 
 /** Instructor area gate. Developers are sent back to the developer area. */

@@ -6,6 +6,7 @@ import { DifficultyBadge } from "@/components/shared/difficulty-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { ProblemForm } from "@/components/instructor/problem-form";
+import { ChallengeManager } from "@/components/instructor/challenge-manager";
 import { relativeTime } from "@/lib/format";
 import { nowMs } from "@/lib/arena/clock";
 import { claimsFor, listAllChallenges, listPathways } from "@/lib/arena/data";
@@ -29,7 +30,7 @@ export default async function InstructorChallengesPage() {
       <PageHeader
         eyebrow="Content authority"
         title="Problems"
-        description="Post a problem with an XP value. Developers claim it, submit evidence, and you approve — that approval is what pays the XP."
+        description="Create, edit, and manage problems, deadlines, and XP. Developers claim problems and submit evidence for your review."
       />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
@@ -55,7 +56,11 @@ export default async function InstructorChallengesPage() {
           ) : (
             <ul className="space-y-3">
               {challenges.map((challenge) => (
-                <ChallengeRowCard key={challenge.id} challenge={challenge} />
+                <ChallengeRowCard
+                  key={challenge.id}
+                  challenge={challenge}
+                  pathwayOptions={pathways}
+                />
               ))}
             </ul>
           )}
@@ -65,7 +70,13 @@ export default async function InstructorChallengesPage() {
   );
 }
 
-async function ChallengeRowCard({ challenge }: { challenge: ChallengeRow }) {
+async function ChallengeRowCard({
+  challenge,
+  pathwayOptions,
+}: {
+  challenge: ChallengeRow;
+  pathwayOptions: Awaited<ReturnType<typeof listPathways>>;
+}) {
   const claimRows = await claimsFor("challenge", challenge.id);
   return (
     <li className="rounded-lg border border-sand-300 bg-sand-50 p-4 shadow-subtle">
@@ -81,12 +92,16 @@ async function ChallengeRowCard({ challenge }: { challenge: ChallengeRow }) {
           {claimRows.length} {claimRows.length === 1 ? "claim" : "claims"}
         </span>
       </div>
+      <p className="mt-2 text-xs text-ink-400">
+        Deadline: {challenge.deadline ? new Date(challenge.deadline).toLocaleString() : "None"}
+      </p>
       <h2 className="mt-2 font-display text-base font-semibold tracking-tight text-ink-900">
         {challenge.title}
       </h2>
       <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-ink-500">
         {challenge.summary}
       </p>
+      <ChallengeManager challenge={challenge} pathwayOptions={pathwayOptions} />
     </li>
   );
 }

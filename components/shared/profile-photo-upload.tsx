@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Camera, ChevronDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { deleteProfileImage, uploadProfileImage } from "@/lib/arena/actions";
+import { SignOutButton } from "./sign-out-button";
 
 export function ProfilePhotoUpload({
   avatarUrl,
@@ -102,6 +103,8 @@ export function ProfilePhotoUpload({
                 Remove photo
               </button>
             ) : null}
+            <div className="my-1 border-t border-sand-300" />
+            <SignOutButton variant="menu" />
           </div>
         </details>
       ) : (

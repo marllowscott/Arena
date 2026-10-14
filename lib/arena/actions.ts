@@ -54,7 +54,6 @@ export async function login(formData: FormData): Promise<ActionResult> {
 }
 
 export async function signup(formData: FormData): Promise<ActionResult> {
-  const role = String(formData.get("role") ?? "developer");
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const fullName = String(formData.get("fullName") ?? "").trim();
@@ -65,19 +64,6 @@ export async function signup(formData: FormData): Promise<ActionResult> {
   }
   if (password.length < 6) {
     return { error: "Password must be at least 6 characters." };
-  }
-
-  /* The instructor is a single authorized account. The address lives in
-     server env, never in source, and the database enforces the same rule
-     when it provisions the profile. */
-  if (role === "instructor") {
-    const authorized = process.env.INSTRUCTOR_EMAIL;
-    if (!authorized || email.toLowerCase() !== authorized.toLowerCase()) {
-      return {
-        error:
-          "Instructor signup is restricted to the authorized instructor account. Use Log In instead.",
-      };
-    }
   }
 
   const supabase = await createClient();
@@ -106,7 +92,7 @@ export async function signup(formData: FormData): Promise<ActionResult> {
     return { error: `Signup failed: ${String(error.message)}` };
   }
 
-  if (!data.user) {
+  if (!data.user || !data.session) {
     return {
       info: "Check your email to confirm your account, then log in. If the email never arrives, turn off 'Enable email confirmation' in the Supabase dashboard (Authentication → Settings).",
     };
@@ -330,51 +316,156 @@ export async function submitOpportunity(
 /* Instructor: content and review authority                                    */
 /* -------------------------------------------------------------------------- */
 
-export async function createProblem(formData: FormData): Promise<ActionResult> {
-  await requireInstructor();
+const PROBLEM_PATHWAYS = ["builder", "problem-solver", "teacher", "mentor", "scout"];
+const PROBLEM_DIFFICULTIES = ["starter", "builder", "advanced", "expert", "boss"];
+const PROBLEM_STATUSES = ["open", "locked", "closed", "draft"];
+
+function problemFromForm(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
+  const slug =
+    String(formData.get("slug") ?? "").trim() ||
+    title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60);
+  const codename = String(formData.get("codename") ?? "").trim() || title;
   const summary = String(formData.get("summary") ?? "").trim();
   const mission = String(formData.get("mission") ?? "").trim();
   const pathwayId = String(formData.get("pathwayId") ?? "builder");
   const difficulty = String(formData.get("difficulty") ?? "starter");
   const xp = Number(formData.get("xp") ?? 0);
   const effort = String(formData.get("effort") ?? "1 hour").trim();
+  const deadlineInput = String(formData.get("deadline") ?? "").trim();
+  const status = String(formData.get("status") ?? "open");
   const whyItMatters = String(formData.get("whyItMatters") ?? "").trim();
+  const splitLines = (name: string) =>
+    String(formData.get(name) ?? "")
+      .split(/\r?\n/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  const tags = String(formData.get("tags") ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  let deadline: string | null = null;
+  if (deadlineInput) {
+    const parsedDeadline = new Date(deadlineInput);
+    if (Number.isNaN(parsedDeadline.getTime())) {
+      return { error: "Enter a valid deadline." } as const;
+    }
+    deadline = parsedDeadline.toISOString();
+  }
+
+  let rubric: unknown[] = [];
+  const rubricInput = String(formData.get("rubric") ?? "").trim();
+  if (rubricInput) {
+    try {
+      const parsedRubric: unknown = JSON.parse(rubricInput);
+      if (!Array.isArray(parsedRubric)) {
+        return { error: "Rubric must be a JSON array." } as const;
+      }
+      rubric = parsedRubric;
+    } catch {
+      return { error: "Rubric must be valid JSON." } as const;
+    }
+  }
 
   if (!title) return { error: "A title is required." };
   if (!summary || !mission) return { error: "Summary and mission are required." };
-  if (!Number.isFinite(xp) || xp < 5 || xp > 1000) {
-    return { error: "XP must be between 5 and 1000." };
+  if (!slug) return { error: "A URL slug is required." };
+  if (!PROBLEM_PATHWAYS.includes(pathwayId)) return { error: "Choose a valid pathway." };
+  if (!PROBLEM_DIFFICULTIES.includes(difficulty)) return { error: "Choose a valid difficulty." };
+  if (!PROBLEM_STATUSES.includes(status)) return { error: "Choose a valid status." };
+  if (!Number.isInteger(xp) || xp < 5 || xp > 1000) {
+    return { error: "XP must be a whole number between 5 and 1000." };
   }
 
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .slice(0, 60);
+  return {
+    data: {
+      slug,
+      title,
+      codename,
+      summary,
+      pathway_id: pathwayId,
+      difficulty,
+      xp,
+      estimated_effort: effort || "1 hour",
+      deadline,
+      status,
+      tags,
+      mission,
+      why_it_matters: whyItMatters,
+      requirements: splitLines("requirements"),
+      evidence: splitLines("evidence"),
+      explain_prompt: String(formData.get("explainPrompt") ?? "").trim(),
+      broke_prompt: String(formData.get("brokePrompt") ?? "").trim(),
+      rubric,
+      recommendation_reason: String(formData.get("recommendationReason") ?? "").trim(),
+      recommended: formData.get("recommended") === "on",
+    },
+  } as const;
+}
+
+export async function createProblem(formData: FormData): Promise<ActionResult> {
+  await requireInstructor();
+  const parsed = problemFromForm(formData);
+  if ("error" in parsed) return parsed;
 
   const supabase = await createClient();
-  const { error } = await supabase.from("challenges").insert({
-    slug,
-    title,
-    codename: title,
-    summary,
-    pathway_id: pathwayId,
-    difficulty,
-    xp,
-    estimated_effort: effort || "1 hour",
-    mission,
-    why_it_matters: whyItMatters,
-    status: "open",
-  });
+  const { error } = await supabase.from("challenges").insert(parsed.data);
 
   if (error) {
     if (String(error.code) === "23505") {
-      return { error: "A problem with that title already exists." };
+      return { error: "A problem with that URL slug already exists." };
     }
-    return { error: "Could not publish the problem." };
+    return {
+      error: `Problem publication failed (${error.code}): ${error.message}`,
+    };
   }
   return { ok: true, info: "Problem published to the Arena." };
+}
+
+export async function updateProblem(id: string, formData: FormData): Promise<ActionResult> {
+  await requireInstructor();
+  if (!id.trim()) return { error: "Unknown problem." };
+  const parsed = problemFromForm(formData);
+  if ("error" in parsed) return parsed;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("challenges").update(parsed.data).eq("id", id);
+  if (error) {
+    if (error.code === "23505") return { error: "A problem with that URL slug already exists." };
+    return { error: `Could not update problem (${error.code}): ${error.message}` };
+  }
+
+  revalidatePath("/instructor/challenges");
+  revalidatePath("/arena");
+  revalidatePath(`/arena/${id}`);
+  return { ok: true, info: "Problem updated." };
+}
+
+export async function deleteProblem(id: string): Promise<ActionResult> {
+  await requireInstructor();
+  if (!id.trim()) return { error: "Unknown problem." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("challenges")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    return { error: `Could not delete problem (${error.code}): ${error.message}` };
+  }
+  if (!data) {
+    return {
+      error:
+        "Problem was not deleted. It may already be gone, or the instructor delete permission is missing in Supabase. Apply migration 0009_instructor_problem_crud.sql and try again.",
+    };
+  }
+
+  revalidatePath("/instructor/challenges");
+  revalidatePath("/arena");
+  revalidatePath(`/arena/${id}`);
+  return { ok: true, info: "Problem deleted." };
 }
 
 export async function createTopic(formData: FormData): Promise<ActionResult> {
@@ -517,6 +608,86 @@ export async function requestDevShopReward(
   if (error) return { error: error.message };
   revalidatePath("/dev-shop");
   return { ok: true, info: "Request sent to the instructor." };
+}
+
+export async function saveDevShopReward(formData: FormData): Promise<ActionResult> {
+  await requireInstructor();
+
+  const rewardId = String(formData.get("rewardId") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const category = String(formData.get("category") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const details = String(formData.get("details") ?? "").trim();
+  const pointsCost = Number(formData.get("pointsCost") ?? 0);
+
+  if (!name || !category || !description || !details) {
+    return { error: "Complete all reward fields." };
+  }
+  if (name.length > 120 || category.length > 80) {
+    return { error: "Name must be 120 characters or fewer and category 80 or fewer." };
+  }
+  if (description.length > 500 || details.length > 1000) {
+    return { error: "Description must be 500 characters or fewer and details 1000 or fewer." };
+  }
+  if (!Number.isInteger(pointsCost) || pointsCost < 1 || pointsCost > 100000) {
+    return { error: "Point cost must be a whole number between 1 and 100,000." };
+  }
+
+  const supabase = await createClient();
+  const reward = {
+    name,
+    category,
+    description,
+    details,
+    points_cost: pointsCost,
+    active: formData.get("active") === "on",
+  };
+
+  const result = rewardId
+    ? await supabase.from("dev_shop_rewards").update(reward).eq("id", rewardId)
+    : await supabase.from("dev_shop_rewards").insert({
+        ...reward,
+        id:
+          name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "")
+            .slice(0, 48) || `reward-${Date.now()}`,
+        sort_order: Date.now(),
+      });
+
+  if (result.error) {
+    if (result.error.code === "23505") {
+      return { error: "A reward with that name already exists. Edit the existing reward instead." };
+    }
+    return { error: `Could not save reward (${result.error.code}): ${result.error.message}` };
+  }
+
+  revalidatePath("/instructor/dev-shop");
+  revalidatePath("/dev-shop");
+  return { ok: true, info: rewardId ? "Reward updated." : "Reward added to the Dev Shop." };
+}
+
+export async function setDevShopRewardActive(
+  rewardId: string,
+  active: boolean,
+): Promise<ActionResult> {
+  await requireInstructor();
+  if (!rewardId.trim()) return { error: "Choose a reward first." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("dev_shop_rewards")
+    .update({ active })
+    .eq("id", rewardId);
+
+  if (error) {
+    return { error: `Could not update reward (${error.code}): ${error.message}` };
+  }
+
+  revalidatePath("/instructor/dev-shop");
+  revalidatePath("/dev-shop");
+  return { ok: true };
 }
 
 export async function reviewDevShopRedemption(

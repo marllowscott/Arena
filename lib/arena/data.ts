@@ -22,6 +22,11 @@ export interface ChallengeRow {
   why_it_matters: string;
   requirements: string[];
   evidence: string[];
+  explain_prompt: string;
+  broke_prompt: string;
+  rubric: unknown[];
+  recommendation_reason: string;
+  recommended: boolean;
   completions: number;
   created_at: string;
 }

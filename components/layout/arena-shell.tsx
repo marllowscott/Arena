@@ -2,18 +2,18 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Menu, ShieldCheck, UserRound, X, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Menu, ShieldCheck, UserRound, X, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { BrandMark, NavList, SwitchAreaLink } from "./sidebar-parts";
 import { formatXp } from "@/lib/format";
 import { levelForXp } from "@/lib/progression";
 import { developerNav, instructorNav, isActivePath, type NavItem } from "@/lib/nav";
-import { logout } from "@/lib/arena/actions";
 import { cn } from "@/lib/utils";
 import { useSidebarState } from "./sidebar-state";
 import { ProfilePhotoUpload } from "@/components/shared/profile-photo-upload";
+import { SignOutButton } from "@/components/shared/sign-out-button";
 
 interface ShellIdentity {
   name: string;
@@ -30,26 +30,6 @@ interface ShellIdentity {
   progress: number;
   xpToNext: number;
   profileHref: string;
-}
-
-function SignOutButton() {
-  const router = useRouter();
-  const [pending, setPending] = React.useState(false);
-  return (
-    <button
-      type="button"
-      disabled={pending}
-      onClick={async () => {
-        setPending(true);
-        await logout();
-        router.refresh();
-      }}
-      className="flex h-10 items-center justify-between gap-2 rounded-md border border-ink-700 bg-ink-850 px-3 text-xs text-sand-300 transition-colors hover:border-ink-600 hover:text-sand-100 disabled:opacity-50"
-    >
-      <span className="font-mono text-[10px] uppercase tracking-[0.12em]">Sign out</span>
-      <LogOut className="size-3.5" aria-hidden />
-    </button>
-  );
 }
 
 function MobileDrawer({
@@ -162,15 +142,16 @@ function ShellFrame({
         <div className="space-y-2 pt-4">
           {!sidebarState.collapsed && footer}
           {sidebarState.collapsed && (
-            <div className="px-2">
+            <div className="flex flex-col items-center gap-2">
               <button
                 type="button"
                 onClick={toggleSidebar}
                 aria-label="Expand sidebar"
-                className="w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs text-sand-300 transition-colors hover:bg-ink-850 hover:text-sand-100"
+                className="inline-flex size-10 items-center justify-center rounded-md text-sand-300 transition-colors hover:bg-ink-850 hover:text-sand-100"
               >
                 <ChevronRight className="size-4" aria-hidden />
               </button>
+              <SignOutButton variant="collapsed" />
             </div>
           )}
         </div>

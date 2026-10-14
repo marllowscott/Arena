@@ -2,21 +2,19 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Building2, KeyRound, Target, Trophy, UserRound } from "lucide-react";
+import { ArrowRight, Building2, Target, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FieldError, Input, Label } from "@/components/ui/input";
+import { Input, Label } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { login, signup } from "@/lib/arena/actions";
 
 /**
- * Real Supabase Auth: create an account or log in. Account creation
- * offers Developer or Instructor; instructor signup is restricted by
- * the server to the single authorized instructor email.
+ * Real Supabase Auth: create an account or log in. The database assigns
+ * access from the account email domain.
  */
 export function AuthView() {
   const router = useRouter();
   const [mode, setMode] = React.useState<"login" | "signup">("login");
-  const [role, setRole] = React.useState<"developer" | "instructor">("developer");
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<{ kind: "error" | "info"; text: string } | null>(null);
 
@@ -115,39 +113,6 @@ export function AuthView() {
           </div>
 
           <form action={handleSubmit} className="mt-6 space-y-4">
-            {mode === "signup" ? (
-              <fieldset>
-                <legend className="sr-only">Account type</legend>
-                <div className="grid grid-cols-2 gap-2">
-                  {(
-                    [
-                      { id: "developer", label: "Developer", icon: UserRound, body: "Solve, present, scout" },
-                      { id: "instructor", label: "Instructor", icon: KeyRound, body: "The authorized account" },
-                    ] as const
-                  ).map((candidate) => (
-                    <button
-                      key={candidate.id}
-                      type="button"
-                      onClick={() => setRole(candidate.id)}
-                      aria-pressed={role === candidate.id}
-                      className={cn(
-                        "rounded-md border p-3 text-left transition-colors",
-                        role === candidate.id
-                          ? "border-primary bg-primary-tint"
-                          : "border-sand-400 bg-sand-100 hover:border-ink-300",
-                      )}
-                    >
-                      <span className="flex items-center gap-2 text-sm font-medium text-ink-800">
-                        <candidate.icon className="size-4" aria-hidden />
-                        {candidate.label}
-                      </span>
-                      <span className="mt-1 block text-xs text-ink-400">{candidate.body}</span>
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-            ) : null}
-
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -186,8 +151,6 @@ export function AuthView() {
               </div>
             ) : null}
 
-            <input type="hidden" name="role" value={role} />
-
             {message ? (
               <div
                 role={message.kind === "error" ? "alert" : "status"}
@@ -207,17 +170,9 @@ export function AuthView() {
                 ? "Please wait"
                 : mode === "login"
                   ? "Log in"
-                  : role === "instructor"
-                    ? "Create instructor account"
-                    : "Create developer account"}
+                  : "Create account"}
               <ArrowRight className="size-4" aria-hidden />
             </Button>
-
-{mode === "signup" && role === "instructor" ? (
-              <FieldError className="text-center">
-                Instructor signup is restricted to the authorized instructor email.
-              </FieldError>
-            ) : null}
           </form>
         </section>
       </div>
