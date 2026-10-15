@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { ArrowRight, Building2, Target, Trophy } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ export function LoginView() {
     <div className="min-h-dvh bg-sand-100">
       <div className="mx-auto w-full max-w-2xl px-6 py-12 sm:py-20">
         <header>
+          <Image src="/logo.svg" alt="" width={48} height={48} className="mb-4 size-12" />
           <span className="eyebrow">{INSTRUCTOR.hub}</span>
           <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
             Dev Arena

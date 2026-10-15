@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { ArrowRight, Building2, Target, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input, Label } from "@/components/ui/input";
+import { Input, Label, PasswordInput } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { login, signup } from "@/lib/arena/actions";
 
@@ -58,9 +59,13 @@ export function AuthView() {
     <div className="min-h-dvh bg-sand-100">
       <div className="mx-auto w-full max-w-xl px-6 py-12 sm:py-20">
         <header className="text-center">
-          <span className="inline-flex size-12 items-center justify-center rounded-md bg-primary font-display text-lg font-bold text-sand-50">
-            DA
-          </span>
+          <Image
+            src="/logo.svg"
+            alt=""
+            width={48}
+            height={48}
+            className="mx-auto size-12"
+          />
           <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
             Dev Arena
           </h1>
@@ -127,10 +132,9 @@ export function AuthView() {
 
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
                 name="password"
-                type="password"
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
                 required
                 minLength={6}

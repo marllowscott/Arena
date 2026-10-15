@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
 import { isActivePath, type NavItem } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -11,10 +12,7 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
       prefetch
       className="group flex items-center gap-2.5 rounded-md py-1 pr-2 transition-opacity hover:opacity-90"
     >
-      <span className="relative inline-flex size-8 items-center justify-center rounded-md bg-primary">
-        <span className="absolute inset-0 rounded-md bg-gradient-to-br from-primary to-primary-strong" />
-        <span className="relative font-display text-sm font-bold text-sand-50">DA</span>
-      </span>
+      <Image src="/logo.svg" alt="" width={32} height={32} className="size-8 shrink-0" />
       {!compact ? (
         <span className="flex flex-col leading-none">
           <span className="font-display text-sm font-bold uppercase tracking-[0.16em] text-sand-50">
