@@ -157,14 +157,7 @@ create table public.xp_events (
 
 create index xp_events_developer_idx on public.xp_events (developer_id, created_at desc);
 
--- Pathway XP is derived, not stored, so it can never drift from xp_events.
-create view public.pathway_xp as
-  select developer_id, pathway_id, sum(xp)::integer as xp
-  from public.xp_events
-  group by developer_id, pathway_id;
-
--- -------------------------------------------------------- pathway_xp_awards
--- Server-owned audit trail. Updated by award_xp() only.
+-- Aggregate pathway XP is maintained alongside the append-only event ledger.
 
 create table public.pathway_xp (
   developer_id uuid not null references public.profiles (id) on delete cascade,

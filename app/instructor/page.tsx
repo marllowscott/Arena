@@ -2,13 +2,14 @@ import {
   ClipboardCheck,
   Compass,
   ListChecks,
+  LifeBuoy,
   Presentation,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/shared/section-heading";
 import { StatCard } from "@/components/shared/stat-card";
-import { hubActivity, leaderboard, pendingOpportunities, pendingSubmissions } from "@/lib/arena/data";
+import { flaggedProbeCount, hubActivity, leaderboard, pendingOpportunities, pendingSubmissions } from "@/lib/arena/data";
 import { requireInstructor } from "@/lib/arena/session";
 import { formatXp, relativeTime } from "@/lib/format";
 import { nowMs } from "@/lib/arena/clock";
@@ -16,11 +17,12 @@ import { nowMs } from "@/lib/arena/clock";
 export default async function InstructorDashboardPage() {
   await requireInstructor();
 
-  const [submissions, opportunities, roster, activity] = await Promise.all([
+  const [submissions, opportunities, roster, activity, flaggedProbes] = await Promise.all([
     pendingSubmissions(),
     pendingOpportunities(),
     leaderboard(),
     hubActivity(10),
+    flaggedProbeCount(),
   ]);
 
   const topicPresentations = submissions.filter(
@@ -38,7 +40,7 @@ export default async function InstructorDashboardPage() {
         description="You are the review authority. XP is paid only when you approve — never on claims, taps or submissions."
       />
 
-      <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Link href="/instructor/review-queue">
           <StatCard
             label="Problems to review"
@@ -72,6 +74,15 @@ export default async function InstructorDashboardPage() {
             value={`${roster.length}`}
             hint="On the roster"
             icon={Users}
+          />
+        </Link>
+        <Link href="/instructor/probes">
+          <StatCard
+            label="Flagged probes"
+            value={`${flaggedProbes}`}
+            hint="Privacy reports"
+            icon={LifeBuoy}
+            tone="gold"
           />
         </Link>
       </div>

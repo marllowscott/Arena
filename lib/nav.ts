@@ -2,6 +2,7 @@ import {
   ClipboardCheck,
   Compass,
   LayoutDashboard,
+  LifeBuoy,
   ListChecks,
   Presentation,
   Store,
@@ -33,6 +34,7 @@ export const developerNav: NavItem[] = [
 export const instructorNav: NavItem[] = [
   { href: "/instructor", label: "Dashboard", icon: LayoutDashboard, hint: "Needs attention" },
   { href: "/instructor/review-queue", label: "Review Queue", icon: ClipboardCheck, hint: "Submissions" },
+  { href: "/instructor/probes", label: "Probe moderation", icon: LifeBuoy, hint: "Privacy reports" },
   { href: "/instructor/challenges", label: "Problems", icon: Target, hint: "Problem catalogue" },
   { href: "/instructor/topics", label: "Topics", icon: Presentation, hint: "Topics and presentations" },
   { href: "/instructor/opportunities", label: "Opportunities", icon: Compass, hint: "Verification" },

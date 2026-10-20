@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -20,56 +21,47 @@ import { PathwayIcon, PATHWAY_ACCENT } from "@/components/shared/pathway-icon";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageContainer } from "@/components/shared/page-container";
 import { relativeTime } from "@/lib/format";
-import { NOW_MS, services } from "@/lib/services";
+import { nowMs } from "@/lib/arena/clock";
 import { cn } from "@/lib/utils";
-import { useDevArena } from "@/hooks/dev-arena-provider";
+import type { HelpRequestDetail } from "@/lib/services/contracts";
+import { respondToProbe } from "@/lib/arena/actions";
+import { ProbeActionButton } from "@/components/dev/probe-action-button";
+import { FlagProbeForm } from "@/components/dev/flag-probe-form";
 
-export function HelpDetail({ requestId }: { requestId: string }) {
-  const { helpRequests, respondToHelp, confirmHelpAnswer, acceptProbe, releaseProbe, current } =
-    useDevArena();
-  const request = helpRequests.find((item) => item.id === requestId);
+export function HelpDetail({
+  request,
+  developerId,
+}: {
+  request: HelpRequestDetail;
+  developerId: string;
+}) {
+  const router = useRouter();
   const [body, setBody] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
-
-  if (!request) {
-    return (
-      <PageContainer size="narrow">
-        <EmptyState
-          icon={MessageSquare}
-          eyebrow="Not found"
-          title="That help request does not exist"
-          body="It may have been removed. The Probe board still has open probes."
-          action={
-            <Link
-              href="/probe"
-              className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-sand-50 transition-colors hover:bg-primary-strong"
-            >
-              Back to Probe
-            </Link>
-          }
-        />
-      </PageContainer>
-    );
-  }
-
-  const developerId = current.developer.id;
+  const [success, setSuccess] = React.useState<string | null>(null);
+  const [pending, startTransition] = React.useTransition();
   const isMine = request.developerId === developerId;
   const iAccepted = request.acceptedBy === developerId;
-  const helper = request.acceptedBy ? services.developers.byId(request.acceptedBy) : null;
-  const pathway = services.pathways.byId(request.pathwayId)!;
-  const accent = PATHWAY_ACCENT[pathway.icon];
-  const author = services.developers.byId(request.developerId);
+  const pathwayIcon = request.pathwayIcon ?? "lifebuoy";
+  const accent = PATHWAY_ACCENT[pathwayIcon];
+  const authorName = request.developerName;
   const activeRequestId = request.id;
 
   function submitAnswer(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (body.trim().length < 20) {
-      setError("Write enough that they can act on it without asking again.");
-      return;
-    }
-    respondToHelp(activeRequestId, body.trim());
-    setBody("");
     setError(null);
+    setSuccess(null);
+    const formData = new FormData(event.currentTarget);
+    startTransition(async () => {
+      const result = await respondToProbe(activeRequestId, formData);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setBody("");
+      setSuccess(result.info ?? "Answer posted.");
+      router.refresh();
+    });
   }
 
   return (
@@ -86,7 +78,15 @@ export function HelpDetail({ requestId }: { requestId: string }) {
         <div className="space-y-6 lg:col-span-2">
           <Card className="p-6">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone={request.status === "solved" ? "support" : "outline"}>
+              <Badge
+                tone={
+                  request.flagged
+                    ? "primary"
+                    : request.status === "solved"
+                      ? "support"
+                      : "outline"
+                }
+              >
                 {request.status}
               </Badge>
               {request.urgency === "blocking" && request.status !== "solved" ? (
@@ -100,26 +100,26 @@ export function HelpDetail({ requestId }: { requestId: string }) {
                   accent.text,
                 )}
               >
-                <PathwayIcon name={pathway.icon} className="size-3" />
-                {pathway.name}
+                <PathwayIcon name={pathwayIcon} className="size-3" />
+                {request.pathwayName ?? request.pathwayId}
               </span>
             </div>
 
             <div className="mt-4 flex items-center gap-2.5">
               <Avatar
-                initials={author?.initials ?? "??"}
-                name={author?.name}
-                from={author?.avatarFrom}
-                to={author?.avatarTo}
+                initials={request.developerInitials}
+                name={authorName}
+                from={request.developerAvatarFrom}
+                to={request.developerAvatarTo}
                 size="sm"
               />
               <div>
-                <div className="eyebrow">{isMine ? "You are stuck" : `${request.developerName} is stuck`}</div>
+                <div className="eyebrow">{isMine ? "You are stuck" : `${authorName} is stuck`}</div>
                 <time
                   dateTime={request.createdAt}
                   className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-300"
                 >
-                  {relativeTime(request.createdAt, NOW_MS)}
+                  {relativeTime(request.createdAt, nowMs())}
                 </time>
               </div>
             </div>
@@ -147,7 +147,7 @@ export function HelpDetail({ requestId }: { requestId: string }) {
                 <ShieldAlert className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
                 <div>
                   <h2 className="font-display text-sm font-semibold tracking-tight text-ink-900">
-                    Flagged by the instructor
+                    Restricted for instructor review
                   </h2>
                   <p className="mt-1 text-sm leading-relaxed text-ink-500">{request.flagReason}</p>
                 </div>
@@ -179,7 +179,6 @@ export function HelpDetail({ requestId }: { requestId: string }) {
             ) : (
               <ol className="mt-4 space-y-3">
                 {request.answers.map((answer) => {
-                  const answerAuthor = services.developers.byId(answer.authorId);
                   const confirmed = answer.confirmed;
                   return (
                     <li key={answer.id}>
@@ -192,15 +191,15 @@ export function HelpDetail({ requestId }: { requestId: string }) {
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-2.5">
                             <Avatar
-                              initials={answerAuthor?.initials ?? "??"}
-                              name={answerAuthor?.name}
-                              from={answerAuthor?.avatarFrom}
-                              to={answerAuthor?.avatarTo}
+                              initials={answer.authorInitials ?? "??"}
+                              name={answer.authorName}
+                              from={answer.authorAvatarFrom}
+                              to={answer.authorAvatarTo}
                               size="sm"
                             />
                             <div>
                               <div className="text-sm font-medium text-ink-800">
-                                {answerAuthor?.name ?? "A developer"}
+                                {answer.authorName ?? "A developer"}
                                 {answer.authorId === developerId ? (
                                   <span className="ml-2 font-mono text-[9px] uppercase tracking-[0.12em] text-secondary-muted">
                                     You
@@ -211,7 +210,7 @@ export function HelpDetail({ requestId }: { requestId: string }) {
                                 dateTime={answer.createdAt}
                                 className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-300"
                               >
-                                {relativeTime(answer.createdAt, NOW_MS)}
+                                {relativeTime(answer.createdAt, nowMs())}
                               </time>
                             </div>
                           </div>
@@ -227,20 +226,26 @@ export function HelpDetail({ requestId }: { requestId: string }) {
                           <div className="mt-4 flex items-center gap-2 border-t border-support/40 pt-3">
                             <CheckCircle2 className="size-4 text-support-deep" aria-hidden />
                             <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-support-deep">
-                              This solved my problem · +8 Mentor XP
+                              {request.mentorXpAwarded
+                                ? "This solved my problem · +8 Mentor XP"
+                                : "This solved my problem · no persisted XP award recorded"}
                             </span>
                           </div>
-                        ) : isMine && request.status !== "solved" ? (
+                        ) : isMine &&
+                          request.status === "open" &&
+                          request.acceptedBy === answer.authorId ? (
                           <div className="mt-4 border-t border-sand-300 pt-3">
-                            <Button
+                            <ProbeActionButton
+                              action={{
+                                kind: "confirm",
+                                requestId: request.id,
+                                answerId: answer.id,
+                              }}
                               variant="success"
-                              size="sm"
-                              tone="tech"
-                              onClick={() => confirmHelpAnswer(request.id, answer.id)}
                             >
                               <CheckCircle2 className="size-3.5" aria-hidden />
                               This solved my problem
-                            </Button>
+                            </ProbeActionButton>
                             <p className="mt-2 text-xs leading-relaxed text-ink-400">
                               Confirming pays the author 8 Mentor XP. Be honest — a wrong confirmation
                               teaches everyone the wrong thing.
@@ -271,8 +276,8 @@ export function HelpDetail({ requestId }: { requestId: string }) {
                     <Avatar
                       initials={request.acceptedByInitials ?? "??"}
                       name={request.acceptedByName ?? undefined}
-                      from={helper?.avatarFrom}
-                      to={helper?.avatarTo}
+                      from={request.acceptedByAvatarFrom ?? undefined}
+                      to={request.acceptedByAvatarTo ?? undefined}
                       size="sm"
                     />
                     <div className="min-w-0">
@@ -286,21 +291,18 @@ export function HelpDetail({ requestId }: { requestId: string }) {
                           dateTime={request.acceptedAt}
                           className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-300"
                         >
-                          {relativeTime(request.acceptedAt, NOW_MS)}
+                          {relativeTime(request.acceptedAt, nowMs())}
                         </time>
                       ) : null}
                     </div>
                   </div>
-                  {iAccepted ? (
-                    <Button
+                  {iAccepted && request.status === "open" && !request.flagged ? (
+                    <ProbeActionButton
+                      action={{ kind: "release", requestId: request.id }}
                       variant="secondary"
-                      size="sm"
-                      tone="tech"
-                      className="mt-4 w-full"
-                      onClick={() => releaseProbe(request.id)}
                     >
                       Drop this probe
-                    </Button>
+                    </ProbeActionButton>
                   ) : (
                     <p className="mt-3 border-t border-sand-300 pt-3 text-xs leading-relaxed text-ink-400">
                       One helper per probe. Write your answer below only if you accepted it.
@@ -317,10 +319,13 @@ export function HelpDetail({ requestId }: { requestId: string }) {
                     {request.developerName} is waiting. Accept it to take ownership and write the
                     answer.
                   </p>
-                  <Button tone="tech" className="mt-4 w-full" onClick={() => acceptProbe(request.id)}>
+                  <ProbeActionButton
+                    action={{ kind: "accept", requestId: request.id }}
+                    variant="primary"
+                  >
                     <HandHelping className="size-4" aria-hidden />
                     Help with this
-                  </Button>
+                  </ProbeActionButton>
                   <p className="mt-3 border-t border-primary-line/60 pt-3 text-xs leading-relaxed text-ink-400">
                     First to accept owns it. You can drop it later and it goes back on the board.
                   </p>
@@ -328,17 +333,21 @@ export function HelpDetail({ requestId }: { requestId: string }) {
               )
             ) : null}
 
-            {!isMine && request.status !== "solved" && iAccepted ? (
+            {!isMine && request.status === "open" && !request.flagged && iAccepted ? (
               <Card className="p-5">
                 <div className="eyebrow mb-3">Write an answer</div>
                 <form onSubmit={submitAnswer} noValidate>
                   <Label htmlFor="answer">Your answer</Label>
                   <Textarea
                     id="answer"
+                    name="body"
                     value={body}
                     onChange={(event) => setBody(event.target.value)}
                     placeholder="Ask what they expected to see, then point at the layer where it differs…"
                     className="min-h-32"
+                    minLength={20}
+                    maxLength={5000}
+                    required
                     aria-invalid={error ? true : undefined}
                   />
                   {error ? (
@@ -346,9 +355,14 @@ export function HelpDetail({ requestId }: { requestId: string }) {
                       {error}
                     </p>
                   ) : null}
-                  <Button type="submit" tone="tech" className="mt-4 w-full">
+                  {success ? (
+                    <p role="status" className="mt-1.5 text-xs font-medium text-support-deep">
+                      {success}
+                    </p>
+                  ) : null}
+                  <Button type="submit" tone="tech" className="mt-4 w-full" disabled={pending}>
                     <Send className="size-4" aria-hidden />
-                    Post answer
+                    {pending ? "Posting…" : "Post answer"}
                   </Button>
                 </form>
                 <p className="mt-3 border-t border-sand-300 pt-3 text-xs leading-relaxed text-ink-400">
@@ -383,6 +397,10 @@ export function HelpDetail({ requestId }: { requestId: string }) {
                   problem can find it.
                 </p>
               </Card>
+            ) : null}
+
+            {isMine || iAccepted ? (
+              <FlagProbeForm requestId={request.id} flagged={request.flagged} />
             ) : null}
 
             <Card className="p-5">

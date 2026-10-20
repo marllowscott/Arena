@@ -7,6 +7,7 @@ import type {
   Developer,
   DeveloperSummary,
   Difficulty,
+  HelpAnswer,
   HelpRequest,
   InstructorAttention,
   LeaderboardEntry,
@@ -31,13 +32,13 @@ import type { OPPORTUNITY_PIPELINE } from "@/lib/progression";
 /**
  * SERVICE BOUNDARY
  *
- * Phase 1: every contract below is satisfied by the read-only mock repositories
- * in `./mock`. Phase 2: each mock file is replaced by a Supabase repository
- * returning the same shapes. Components do not change; only this layer does.
+ * These are the read contracts the UI is written against. The live
+ * implementations live in `lib/arena/data.ts` (reads) and `lib/arena/actions.ts`
+ * (mutations), both reading and writing the Supabase database directly.
  *
- * Mutations are intentionally *not* part of these read contracts. They live on
- * the session provider (`hooks/dev-arena-provider.tsx`), which is the one place
- * that knows about local optimistic state until the database exists.
+ * Mutations are intentionally *not* part of these read contracts. They live in
+ * the server actions, which is the one place that enforces the database's
+ * access rules.
  */
 
 export interface DeveloperRecord extends Developer {
@@ -83,9 +84,25 @@ export interface TeachingProposalWithAuthor extends TeachingProposal {
 export interface HelpRequestDetail extends HelpRequest {
   developerName: string;
   developerInitials: string;
+  developerAvatarFrom?: string;
+  developerAvatarTo?: string;
   /** Name of the developer who accepted, when the probe is being helped. */
   acceptedByName: string | null;
   acceptedByInitials: string | null;
+  acceptedByAvatarFrom?: string | null;
+  acceptedByAvatarTo?: string | null;
+  pathwayName?: string;
+  pathwayShortName?: string;
+  pathwayIcon?: Pathway["icon"];
+  mentorXpAwarded?: boolean;
+  answers: Array<
+    HelpAnswer & {
+      authorName?: string;
+      authorInitials?: string;
+      authorAvatarFrom?: string;
+      authorAvatarTo?: string;
+    }
+  >;
 }
 
 export interface DeveloperService {

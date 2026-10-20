@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import { Audiowide, IBM_Plex_Mono, Iceland } from "next/font/google";
 import "./globals.css";
-import { DevArenaProvider } from "@/hooks/dev-arena-provider";
-import { XpToasts } from "@/components/dev/xp-toast";
-import { TitleUnlockOverlay } from "@/components/dev/title-unlock-overlay";
 
 const audiowide = Audiowide({
   variable: "--font-audiowide",
@@ -45,12 +42,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Skip to content
         </a>
-        <DevArenaProvider>
-          <div id="main">{children}</div>
-          <XpToasts />
-          <TitleUnlockOverlay />
-        </DevArenaProvider>
+        <div id="main">{children}</div>
       </body>
     </html>
   );
 }
+
+
+ 

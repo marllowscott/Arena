@@ -5,9 +5,15 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityStatusBadge } from "@/components/arena/status-badge";
 import { OpportunityVerification } from "@/components/instructor/opportunity-verification";
+import { CuratedOpportunityManager } from "@/components/instructor/curated-opportunity-manager";
 import { formatXp, relativeTime } from "@/lib/format";
 import { nowMs } from "@/lib/arena/clock";
-import { listOpportunities, pendingOpportunities } from "@/lib/arena/data";
+import {
+  curatedOpportunities,
+  listOpportunities,
+  pendingOpportunities,
+} from "@/lib/arena/data";
+import { supportsListingState } from "@/lib/arena/schema";
 import { requireInstructor } from "@/lib/arena/session";
 
 export const metadata: Metadata = {
@@ -17,9 +23,10 @@ export const metadata: Metadata = {
 
 export default async function InstructorOpportunitiesPage() {
   await requireInstructor();
-  const [pending, all] = await Promise.all([
+  const [pending, all, curated] = await Promise.all([
     pendingOpportunities(),
     listOpportunities(),
+    curatedOpportunities(),
   ]);
 
   /* Submissions by developers, newest first. Curated rows (no author)
@@ -38,6 +45,11 @@ export default async function InstructorOpportunitiesPage() {
         eyebrow="Verification authority"
         title="Opportunities"
         description="Developers submit jobs, hackathons, scholarships and programmes. You verify the listing is real and open — verification is what awards the Scout XP."
+      />
+
+      <CuratedOpportunityManager
+        opportunities={curated}
+        supportsListingState={await supportsListingState()}
       />
 
       <section className="mt-8">

@@ -62,6 +62,13 @@ export function TopicForm({
           <Label htmlFor="xpReward">XP reward</Label>
           <Input id="xpReward" name="xpReward" type="number" min={5} max={500} required defaultValue={40} />
         </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="status">Visibility</Label>
+          <Select id="status" name="status" defaultValue="open">
+            <option value="open">Publish now</option>
+            <option value="draft">Save as draft</option>
+          </Select>
+        </div>
       </div>
 
       {error ? <FieldError>{error}</FieldError> : null}

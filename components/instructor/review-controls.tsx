@@ -38,10 +38,15 @@ export function ReviewControls({ submission }: { submission: SubmissionRow }) {
       );
       if (result.error) {
         setError(result.error);
-        setPending(false);
         return;
       }
       router.refresh();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not resolve this submission. Please try again.",
+      );
     } finally {
       setPending(false);
     }

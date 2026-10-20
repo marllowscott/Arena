@@ -12,7 +12,7 @@ import { EvidenceForm } from "@/components/arena/evidence-form";
 import { formatXp } from "@/lib/format";
 import {
   claimsFor,
-  getChallenge,
+  findChallenge,
   myClaim,
   mySubmissions,
 } from "@/lib/arena/data";
@@ -24,7 +24,7 @@ export async function generateMetadata({
   params: Promise<{ challengeId: string }>;
 }): Promise<Metadata> {
   const { challengeId } = await params;
-  const challenge = await getChallenge(challengeId);
+  const challenge = await findChallenge(challengeId);
   return {
     title: challenge?.title ?? "Problem",
     description: challenge?.summary ?? "Dev Arena problem",
@@ -40,7 +40,7 @@ export default async function ChallengeDetailPage({
   const session = await requireDeveloper();
   const profile = session.profile!;
 
-  const challenge = await getChallenge(challengeId);
+  const challenge = await findChallenge(challengeId);
 
   if (!challenge) {
     return (

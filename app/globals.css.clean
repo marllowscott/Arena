@@ -1,0 +1,150 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   DEV ARENA — DESIGN TOKENS
+   Primary #007dcc · Secondary #ffb900 · Foundation #F0F8FF
+   Support #d10056 · Support Neutral #6B7280
+   ========================================================================== */
+
+@theme {
+  --font-display: var(--font-audiowide), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-iceland), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* Ink — BLACK text for all non-sidebar content */
+  --color-ink-950: #000000;
+  --color-ink-900: #000000;
+  --color-ink-850: #000000;
+  --color-ink-800: #000000;
+  --color-ink-700: #111111;
+  --color-ink-600: #333333;
+  --color-ink-500: #444444;
+  --color-ink-400: #666666;
+  --color-ink-300: #888888;
+  --color-ink-200: #AAAAAA;
+
+  /* Sand — ALICE BLUE foundation and surfaces */
+  --color-sand-50: #F0F8FF;
+  --color-sand-100: #E6F0FF;
+  --color-sand-200: #CCE0FF;
+  --color-sand-300: #99C2FF;
+  --color-sand-400: #66A3FF;
+  --color-sand-500: #3385FF;
+
+  /* Primary — competitive, XP, action. Used deliberately and sparingly. */
+  --color-primary: #007dcc;
+  --color-primary-strong: #0066b3;
+  --color-primary-soft: #3399dd;
+  --color-primary-tint: #E6F2FF;
+  --color-primary-line: #99CCFF;
+
+  /* Secondary — gold, achievement, highlight */
+  --color-secondary: #ffb900;
+  --color-secondary-strong: #e6a700;
+  --color-secondary-soft: #ffc733;
+  --color-secondary-muted: #e6a700;
+  --color-secondary-tint: #FFF8E6;
+  --color-secondary-line: #FFE899;
+
+  /* Support — unlocked, approved, healthy */
+  --color-support: #d10056;
+  --color-support-deep: #b2054c;
+  --color-support-soft: #e84d8a;
+  --color-support-tint: #FDEEF5;
+
+  /* Supporting neutral */
+  --color-hush: #6B7280;
+  --color-hush-soft: #9CA3AF;
+  --color-hush-tint: #F3F4F6;
+
+  --radius-xs: 7px;
+  --radius-sm: 7px;
+  --radius-md: 7px;
+  --radius-lg: 7px;
+  --radius-xl: 7px;
+  --radius-full: 9999px;
+
+   /* Icon shape system */
+   --icon-size-xs: 16px;   /* Extra small */
+   --icon-size-sm: 20px;   /* Small */
+   --icon-size-md: 24px;   /* Medium (default) */
+   --icon-size-lg: 28px;   /* Large */
+   --icon-size-xl: 32px;   /* Extra large */
+
+  --color-hush-tint: #F3F4F6;
+
+  --radius-xs: 7px;
+  --radius-sm: 7px;
+  --radius-md: 7px;
+  --radius-lg: 7px;
+  --radius-xl: 7px;
+  --radius-full: 9999px;
+
+  --shadow-subtle: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.06);
+
+   --icon-size-xl: 32px;   /* Extra large */
+   --icon-size-lg: 28px;   /* Large */
+   --icon-size-md: 24px;   /* Medium (default) */
+   --icon-size-sm: 20px;   /* Small */
+   --icon-size-xs: 16px;   /* Extra small */
+   /* Icon shape system */
+
+  --radius-full: 9999px;
+  --radius-xl: 7px;
+  --radius-lg: 7px;
+  --radius-md: 7px;
+  --radius-sm: 7px;
+  --radius-xs: 7px;
+
+  --color-hush-tint: #F3F4F6;
+  --color-hush-soft: #9CA3AF;
+  --color-hush: #6B7280;
+  /* Supporting neutral */
+
+  --color-support-tint: #FDEEF5;
+  --color-support-soft: #e84d8a;
+  --color-support-deep: #b2054c;
+  --color-support: #d10056;
+  /* Support — unlocked, approved, healthy */
+
+  --color-secondary-line: #FFE899;
+  --color-secondary-tint: #FFF8E6;
+  --color-secondary-muted: #e6a700;
+  --color-secondary-soft: #ffc733;
+  --color-secondary-strong: #e6a700;
+  --color-secondary: #ffb900;
+  /* Secondary — gold, achievement, highlight */
+
+  --color-primary-line: #99CCFF;
+  --color-primary-tint: #E6F2FF;
+  --color-primary-soft: #3399dd;
+  --color-primary-strong: #0066b3;
+  --color-primary: #007dcc;
+  /* Primary — competitive, XP, action. Used deliberately and sparingly. */
+
+  --color-sand-500: #3385FF;
+  --color-sand-400: #66A3FF;
+  --color-sand-300: #99C2FF;
+  --color-sand-200: #CCE0FF;
+  --color-sand-100: #E6F0FF;
+  --color-sand-50: #F0F8FF;
+  /* Sand — ALICE BLUE foundation and surfaces */
+
+  --color-ink-200: #AAAAAA;
+  --color-ink-300: #888888;
+  --color-ink-400: #666666;
+  --color-ink-500: #444444;
+  --color-ink-600: #333333;
+  --color-ink-700: #111111;
+  --color-ink-800: #000000;
+  --color-ink-850: #000000;
+  --color-ink-900: #000000;
+  --color-ink-950: #000000;
+  /* Ink — BLACK text for all non-sidebar content */
+
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+  --font-sans: var(--font-iceland), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-audiowide), ui-sans-serif, system-ui, sans-serif;
+@theme {
+
+   ========================================================================== */

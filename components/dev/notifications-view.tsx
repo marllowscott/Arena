@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   CheckCheck,
@@ -18,12 +19,12 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PageContainer, PageSection } from "@/components/shared/page-container";
 import { PageHeader } from "@/components/shared/section-heading";
 import { relativeTime } from "@/lib/format";
-import { NOW_MS } from "@/lib/services";
-import type { NotificationKind } from "@/lib/types";
+import { nowMs } from "@/lib/arena/clock";
+import { markNotificationsRead } from "@/lib/arena/actions";
+import type { NotificationRow } from "@/lib/arena/data";
 import { cn } from "@/lib/utils";
-import { useDevArena } from "@/hooks/dev-arena-provider";
 
-const KIND_ICON: Record<NotificationKind, React.ElementType> = {
+const KIND_ICON: Record<string, React.ElementType> = {
   xp: Sparkles,
   title: Sparkles,
   challenge: Bell,
@@ -34,7 +35,7 @@ const KIND_ICON: Record<NotificationKind, React.ElementType> = {
   system: Bell,
 };
 
-const KIND_TONE: Record<NotificationKind, string> = {
+const KIND_TONE: Record<string, string> = {
   xp: "border-primary-line bg-primary-tint text-primary",
   title: "border-secondary-line bg-secondary-tint text-secondary-muted",
   challenge: "border-sand-400 bg-sand-200 text-ink-500",
@@ -45,8 +46,31 @@ const KIND_TONE: Record<NotificationKind, string> = {
   system: "border-sand-400 bg-sand-200 text-ink-400",
 };
 
-export function NotificationsView() {
-  const { notifications, markNotificationsRead, unreadCount } = useDevArena();
+export function NotificationsView({
+  notifications,
+  unreadCount,
+}: {
+  notifications: NotificationRow[];
+  unreadCount: number;
+}) {
+  const router = useRouter();
+  const [pending, setPending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function markAllRead() {
+    setPending(true);
+    setError(null);
+    try {
+      const result = await markNotificationsRead();
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <PageContainer size="narrow">
@@ -56,15 +80,24 @@ export function NotificationsView() {
         description="Every XP award, title unlock and answer you confirmed shows up here."
         actions={
           unreadCount > 0 ? (
-            <Button variant="secondary" tone="tech" onClick={markNotificationsRead}>
+            <Button variant="secondary" tone="tech" onClick={markAllRead} disabled={pending}>
               <CheckCheck className="size-4" aria-hidden />
-              Mark all read
+              {pending ? "Marking" : "Mark all read"}
             </Button>
           ) : (
             <Badge tone="neutral">All caught up</Badge>
           )
         }
       />
+
+      {error ? (
+        <p
+          role="alert"
+          className="mt-4 rounded-md border border-primary-line bg-primary-tint px-3 py-2 text-sm text-primary"
+        >
+          {error}
+        </p>
+      ) : null}
 
       <PageSection>
         {notifications.length === 0 ? (
@@ -85,8 +118,8 @@ export function NotificationsView() {
         ) : (
           <ol className="space-y-2">
             {notifications.map((notification, index) => {
-              const Icon = KIND_ICON[notification.kind];
-              const tone = KIND_TONE[notification.kind];
+              const Icon = KIND_ICON[notification.kind] ?? Bell;
+              const tone = KIND_TONE[notification.kind] ?? KIND_TONE.system;
 
               return (
                 <li
@@ -120,10 +153,10 @@ export function NotificationsView() {
                       <p className="mt-1 text-sm leading-relaxed text-ink-700">{notification.body}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-3">
                         <time
-                          dateTime={notification.createdAt}
+                          dateTime={notification.created_at}
                           className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-300"
                         >
-                          {relativeTime(notification.createdAt, NOW_MS)}
+                          {relativeTime(notification.created_at, nowMs())}
                         </time>
                         {notification.href ? (
                           <Link

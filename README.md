@@ -14,38 +14,66 @@ XP is never awarded for claiming, clicking, viewing, or submitting alone. The in
 
 ## Manual deployment checklist
 
-These are the only steps that cannot be done from the codebase. Everything else builds and runs as-is.
+These are the only steps that cannot be done from the codebase. A migration file
+in this repository does not mean it has been applied to Supabase. Check the
+project's migration history before applying anything; do not reapply a version
+that is already recorded as applied.
 
 ### 1. Supabase — apply migrations
 
-In the **Supabase SQL Editor**, apply migrations `0001` through `0006` in
-numeric order. Migration `0002` adds the `profiles.role` column used by the
-current authorization function; `0003` provisions profiles and adds the
-instructor-only RPC checks. `0004` creates the Dev Shop reward catalogue and
-redemption workflow. Dev Points are earned at **1 point per 100 lifetime XP**;
-redeeming reserves points but never removes XP. Instructor decisions are
-handled at `/instructor/dev-shop`; declining a request refunds its points.
-After `0004`, apply `0008_dev_shop_reward_management.sql` to enable instructor
-creation, editing, pricing, and deactivation of catalog rewards. Deactivation
-hides a reward from developers without removing its historical requests.
+Verify or apply the migrations below in numeric order. In particular,
+`0002` relies on the base tables in `0001`, `0003` adds profile provisioning
+and instructor-only RPC checks, and `0007` establishes the role check used by
+subsequent instructor policies.
 
-If the app reports an error loading a profile because `avatar_url` is missing,
-apply `0005_profile_avatar_url.sql`. For profile photo uploads, apply
-`0006_profile_avatar_storage.sql`; it grants authenticated users access only to
-avatar objects named with their own user ID in the existing `PROFILES` bucket.
-The bucket must be configured as public for profile images to display through
-the app's public avatar URLs.
+1. `0001_initial_schema.sql` — base schema and RLS.
+2. `0002_real_auth_and_probe.sql` — real profile provisioning and Probe ownership.
+3. `0003_mvp_authorization.sql` — claims, profile provisioning, instructor-only XP/review RPCs.
+4. `0004_dev_shop.sql` — rewards and redemption requests.
+5. `0005_profile_avatar_url.sql` — required by the current profile query.
+6. `0006_profile_avatar_storage.sql` — required for profile photo uploads.
+7. `0007_domain_based_roles.sql` — role column, role synchronization, instructor checks.
+8. `0008_dev_shop_reward_management.sql` — instructor reward create/edit/deactivate.
+9. `0009_instructor_problem_crud.sql` — problem editing and guarded deletion.
+10. `0010_instructor_workflows.sql` — topic lifecycle, curated opportunities, and atomic reviews.
+11. `0011_persistent_probe_workflow.sql` — persisted Probe actions, moderation, and once-only confirmed-answer XP.
 
-Finally, run `supabase/migrations/0007_domain_based_roles.sql`. It assigns
-`instructor` to every account whose email domain is exactly `uncommon.org`,
-assigns `developer` to all other accounts, synchronizes roles on Auth email
-updates, backfills existing profiles, and preserves the RLS guard against
-self-elevation. **The database role behavior is not updated until this SQL has
-been run successfully.**
+After `0001`, also apply `supabase/seed/0001_reference_data.sql`; it populates
+the pathways and titles required by the app. `0002_example_content.sql` is
+optional demo content and is not required for production.
 
-Run `supabase/migrations/0009_instructor_problem_crud.sql` to enable problem
-editing and deletion. Deletion is rejected for problems with submissions to
-preserve review history; close those problems instead.
+Migrations `0005` and `0006` are needed for the profile/photo functionality
+currently exposed in Settings. `0008` depends on `0004`; apply it after `0007`
+when following the complete ordered sequence. `0009` and `0010` depend on the
+instructor authorization established by `0007`. `0011` depends on the help
+tables and RPCs from `0001`/`0002`, the instructor roles from `0007`, and the
+visibility policies from `0010`.
+
+Migration `0001` creates `pathway_xp` as a table maintained with the XP ledger.
+The earlier SQL also attempted to create a view with the same name; that
+conflicting view declaration has been removed so a fresh database can apply
+the base schema.
+
+Migration `0007` assigns `instructor` to every account whose email domain is
+exactly `uncommon.org`, assigns `developer` to all other accounts, synchronizes
+roles on Auth email updates, backfills existing profiles, and preserves the RLS
+guard against self-elevation. **The database role behavior is not updated until
+this SQL has been run successfully.**
+
+Migration `0009` rejects deleting problems with submissions. Migration `0010`
+rejects deleting topics with submissions. Archive or close those records
+instead. Migration `0010` also enables
+topic drafts and archiving, guards topic deletion when submissions exist,
+restricts student proposals to unpublished drafts, hides pending opportunity
+submissions from other developers, adds instructor-managed curated opportunity
+drafts/publishing/archiving/deletion, limits flagged probe visibility to the
+asker, helper, and instructor, and makes submission/opportunity review and XP
+awards atomic and one-time.
+
+Migration `0011` connects the Probe UI to those persisted tables and RPCs. A
+developer's explicit confirmation of the accepted helper's answer awards the
+existing 8 Mentor XP once; merely asking for or accepting a Probe does not award
+XP. Instructor moderation is available at `/instructor/probes`.
 
 App icons currently render as violet numbered markers (`#B15EFF`). Their stable
 number-to-icon-name assignments are defined in `components/ui/number-icon.tsx`;
@@ -67,8 +95,16 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…
 ```
 
-`NEXT_PUBLIC_` variables are public to the browser by design. Never add a
-service-role key to the frontend environment — it is not needed to run the app.
+Set `SUPABASE_SERVICE_ROLE_KEY` from the Supabase API settings as a server-only
+environment variable to enable instructor developer management. Do not prefix
+it with `NEXT_PUBLIC_`, expose it to client code, or commit it. Configure
+Supabase Auth email delivery/site URL so developer invitations can be sent.
+
+The instructor **Developers** page can invite developers by email, edit their
+name, handle, headline, and primary pathway, and permanently delete their
+accounts. Deletion cascades through the profile's submissions, XP history, and
+related activity. Email addresses under `uncommon.org` are reserved for
+instructor accounts. Roles and XP are never editable from this page.
 
 ### 4. Deploy
 
@@ -88,6 +124,7 @@ determines the dashboard.
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Vercel + `.env.local` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Vercel + `.env.local` | Browser key (public by design; RLS protects data) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Vercel + `.env.local` | Server-only Supabase Admin API for instructor developer account management |
 `.env.local` is git-ignored. No passwords, service-role keys, or tokens belong in the repository.
 
 ## Roles
@@ -103,7 +140,7 @@ components/             UI, arena (real-data) and instructor components
 lib/arena/              server-side session, queries and actions (the real data layer)
 lib/supabase/           browser + server Supabase clients
 lib/services/           Phase-1 mock repositories (legacy screens only, not in nav)
-supabase/migrations/    0001–0007 schema, authorization, features, and role sync
+supabase/migrations/    0001–0011 schema, authorization, features, and workflows
 supabase/seed/          0001 reference data (live) · 0002 optional example content
 ```
 

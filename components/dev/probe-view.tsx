@@ -10,33 +10,41 @@ import { ProbeCard } from "@/components/dev/probe-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageContainer, PageSection } from "@/components/shared/page-container";
 import { PageHeader, SectionHeading } from "@/components/shared/section-heading";
-import { services } from "@/lib/services";
 import { cn } from "@/lib/utils";
-import { useDevArena } from "@/hooks/dev-arena-provider";
+import type { HelpRequestDetail } from "@/lib/services/contracts";
+import type { PathwayRow } from "@/lib/arena/data";
+import { ProbeRequestForm } from "@/components/dev/probe-request-form";
 
 type Scope = "open" | "taken" | "mine" | "solved" | "all";
 
-export function ProbeView() {
-  const { helpRequests, current } = useDevArena();
+export function ProbeView({
+  helpRequests,
+  pathways,
+  developerId,
+  mentorXp,
+}: {
+  helpRequests: HelpRequestDetail[];
+  pathways: PathwayRow[];
+  developerId: string;
+  mentorXp: number;
+}) {
   const [scope, setScope] = React.useState<Scope>("open");
 
-  const developerId = current.developer.id;
-
-  const isOpen = (status: string) => status === "open" || status === "flagged";
   const visible = helpRequests.filter((request) => {
-    if (scope === "open") return isOpen(request.status) && !request.acceptedBy;
-    if (scope === "taken") return Boolean(request.acceptedBy);
+    if (scope === "open") return request.status === "open" && !request.acceptedBy && !request.flagged;
+    if (scope === "taken") return request.status === "open" && Boolean(request.acceptedBy);
     if (scope === "mine") return request.developerId === developerId;
     if (scope === "solved") return request.status === "solved";
     return true;
   });
 
-  const unclaimed = helpRequests.filter((request) => isOpen(request.status) && !request.acceptedBy);
-  const taken = helpRequests.filter((request) => Boolean(request.acceptedBy));
+  const unclaimed = helpRequests.filter(
+    (request) => request.status === "open" && !request.acceptedBy && !request.flagged,
+  );
+  const taken = helpRequests.filter(
+    (request) => request.status === "open" && Boolean(request.acceptedBy),
+  );
   const answered = helpRequests.reduce((sum, request) => sum + request.answers.length, 0);
-  const mentorProgress = services.developers
-    .pathwayProgress(developerId)
-    .find((item) => item.pathwayId === "mentor");
 
   const scopeOptions = [
     { value: "open" as const, label: "Unclaimed", count: unclaimed.length },
@@ -65,14 +73,14 @@ export function ProbeView() {
         <StatCard label="Answers written" value={answered} icon={Sparkles} tone="support" />
         <StatCard
           label="Your Mentor XP"
-          value={mentorProgress?.xp ?? 0}
-          hint={
-            mentorProgress?.nextTitle
-              ? `${mentorProgress.xpToNextTitle} XP to ${mentorProgress.nextTitle.name}`
-              : "Ladder complete"
-          }
+          value={mentorXp}
+          hint="Confirmed Probe answers only"
           tone="gold"
         />
+      </PageSection>
+
+      <PageSection>
+        <ProbeRequestForm pathways={pathways} />
       </PageSection>
 
       <PageSection>
@@ -100,9 +108,16 @@ export function ProbeView() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {visible.map((request, index) => (
-                <div key={request.id} className={cn("animate-fade-up", `stagger-${Math.min(index + 1, 5)}`)}>
-                  <ProbeCard request={request} isMine={request.developerId === developerId} />
-                </div>
+              <div
+                key={request.id}
+                className={cn("animate-fade-up", `stagger-${Math.min(index + 1, 5)}`)}
+              >
+                <ProbeCard
+                  request={request}
+                  developerId={developerId}
+                  isMine={request.developerId === developerId}
+                />
+              </div>
               ))}
             </div>
           )}

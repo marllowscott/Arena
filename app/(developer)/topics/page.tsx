@@ -7,6 +7,10 @@ import { ClaimButton } from "@/components/arena/claim-button";
 import { TopicStatusBadge } from "@/components/arena/status-badge";
 import { SubmissionStatusBadge } from "@/components/arena/status-badge";
 import { EvidenceForm } from "@/components/arena/evidence-form";
+import { TopicProposalForm } from "@/components/dev/topic-proposal-form";
+import { TopicVoteButton } from "@/components/dev/topic-vote-button";
+import { FilterLinks } from "@/components/shared/filter-links";
+import { SearchField } from "@/components/shared/search-field";
 import { formatXp, relativeTime } from "@/lib/format";
 import { nowMs } from "@/lib/arena/clock";
 import {
@@ -16,6 +20,7 @@ import {
   myClaim,
   mySubmissions,
 } from "@/lib/arena/data";
+import { listProposalVotes } from "@/lib/arena/progression";
 import { requireDeveloper } from "@/lib/arena/session";
 import type { SubmissionRow, TopicRow } from "@/lib/arena/data";
 
@@ -24,45 +29,109 @@ export const metadata: Metadata = {
   description: "Research and present a topic. XP on instructor approval.",
 };
 
-export default async function TopicsPage() {
+const TOPIC_FILTERS = ["all", "open", "scheduled", "delivered"] as const;
+
+export default async function TopicsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await requireDeveloper();
   const profile = session.profile!;
+  const params = await searchParams;
 
-  const [topics, pathways, mySubs] = await Promise.all([
+  const [topics, pathways, mySubs, votes] = await Promise.all([
     listTopics(),
     listPathways(),
     mySubmissions(profile.id),
+    listProposalVotes(),
   ]);
+
+  const interest = new Map<string, number>();
+  const myVotes = new Set<string>();
+  for (const vote of votes) {
+    interest.set(vote.proposal_id, (interest.get(vote.proposal_id) ?? 0) + 1);
+    if (vote.voter_id === profile.id) myVotes.add(vote.proposal_id);
+  }
 
   const pathwayName = (id: string) =>
     pathways.find((pathway) => pathway.id === id)?.short_name ?? id;
+
+  const query = (Array.isArray(params.q) ? params.q[0] : params.q ?? "").trim().toLowerCase();
+  const filter = Array.isArray(params.filter) ? params.filter[0] : params.filter ?? "all";
+
+  const visible = topics.filter((topic) => {
+    if (filter !== "all" && topic.status !== filter) return false;
+    if (!query) return true;
+    return `${topic.title} ${topic.summary}`.toLowerCase().includes(query);
+  });
+
+  const filterOptions = TOPIC_FILTERS.map((value) => ({
+    value,
+    label: value === "all" ? "All" : value,
+    count:
+      value === "all"
+        ? topics.length
+        : topics.filter((topic) => topic.status === value).length,
+  }));
 
   return (
     <div className="px-4 py-8 sm:px-6">
       <PageHeader
         eyebrow="Teach"
         title="Topics"
-        description="Research a topic, prepare a short presentation, and submit it. The instructor reviews the presentation — approval pays the topic's XP reward."
+        description="Suggest a topic for the instructor to review, or research a posted topic and submit a presentation."
       />
 
-      {topics.length === 0 ? (
-        <div className="mt-8">
+      <TopicProposalForm pathways={pathways} />
+
+      <div className="mt-8 flex flex-col gap-3 rounded-lg border border-sand-300 bg-sand-50 p-4 shadow-subtle lg:flex-row lg:items-center lg:justify-between">
+        <FilterLinks
+          options={filterOptions}
+          basePath="/topics"
+          params={params}
+          paramName="filter"
+          label="Filter topics"
+          size="sm"
+        />
+        <SearchField
+          name="q"
+          defaultValue={query}
+          placeholder="Search topics"
+          basePath="/topics"
+          params={params}
+          label="Search topics"
+        />
+      </div>
+
+      <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-300">
+        {visible.length} of {topics.length} topics
+      </p>
+
+      {visible.length === 0 ? (
+        <div className="mt-4">
           <EmptyState
             icon={Presentation}
             eyebrow="Topics"
-            title="No topics yet"
-            body="The instructor posts topics for the team to research and present."
+            title={topics.length === 0 ? "No topics yet" : "Nothing matches that filter"}
+            body={
+              topics.length === 0
+                ? "The instructor posts topics for the team to research and present."
+                : "Clear the search or pick a different filter."
+            }
           />
         </div>
       ) : (
-        <ul className="mt-8 space-y-4">
-          {topics.map((topic: TopicRow) => (
+        <ul className="mt-4 space-y-4">
+          {visible.map((topic: TopicRow) => (
             <TopicCard
               key={topic.id}
               topic={topic}
               pathwayName={pathwayName(topic.pathway_id)}
               userId={profile.id}
               mySubmissions={mySubs}
+              interestCount={interest.get(topic.id) ?? 0}
+              hasVoted={myVotes.has(topic.id)}
             />
           ))}
         </ul>
@@ -76,11 +145,15 @@ async function TopicCard({
   pathwayName,
   userId,
   mySubmissions,
+  interestCount,
+  hasVoted,
 }: {
   topic: TopicRow;
   pathwayName: string;
   userId: string;
   mySubmissions: SubmissionRow[];
+  interestCount: number;
+  hasVoted: boolean;
 }) {
   const [claimRow, claimRows] = await Promise.all([
     myClaim("topic", topic.id, userId),
@@ -120,6 +193,13 @@ async function TopicCard({
         {myPresentation ? (
           <SubmissionStatusBadge status={myPresentation.status} />
         ) : null}
+        <span className="ml-auto">
+          <TopicVoteButton
+            proposalId={topic.id}
+            interestCount={interestCount}
+            hasVoted={hasVoted}
+          />
+        </span>
       </div>
 
       {claimed && !myPresentation ? (

@@ -41,9 +41,11 @@ export function OpportunityStatusBadge({ reviewStatus }: { reviewStatus: string 
 
 export function TopicStatusBadge({ status }: { status: string }) {
   const labels: Record<string, string> = {
+    draft: "Draft",
     open: "Open for presentation",
     scheduled: "Scheduled",
     delivered: "Delivered",
+    archived: "Archived",
   };
   return <Badge tone="outline">{labels[status] ?? status}</Badge>;
 }

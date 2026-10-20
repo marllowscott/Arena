@@ -1,17 +1,57 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getSession, isInstructor, requireInstructor, requireSession } from "./session";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { isInstructor, requireInstructor, requireSession } from "./session";
+import { supportsListingState, supportsProbeColumns } from "./schema";
 import type { SubmissionRow } from "./data";
+import type { PathwayId } from "@/lib/types";
+import {
+  deleteAnnouncement as deleteHubAnnouncementRecord,
+  readHubAnnouncements,
+  saveAnnouncement as saveHubAnnouncementRecord,
+  saveHubSettings as persistHubSettings,
+} from "./hub";
 
 const PROFILE_AVATAR_BUCKET = "PROFILES";
 
 export interface ActionResult {
   ok?: boolean;
-  info?: string;
   error?: string;
+  info?: string;
+}
+
+/**
+ * Turn a raw database refusal into something an instructor can act on.
+ *
+ * The deployed database does not yet carry every migration this app targets:
+ * the probe workflow (0002) and the instructor workflows (0010) are still
+ * pending. Those refusals surface as row-level security errors, missing
+ * columns, check-constraint failures, or a function that is not in the
+ * schema cache. Naming the missing piece beats echoing SQL.
+ */
+function explainDbError(
+  error: { code?: string; message: string },
+  context: string,
+): string {
+  const code = String(error.code ?? "");
+  const message = error.message ?? "";
+
+  if (code === "42501" || /row-level security/i.test(message)) {
+    return `${context} is refused by this deployment's access rules. The instructor-workflows migration (0010) has to be applied before the database will allow it.`;
+  }
+  if (code === "42703" || /Could not find the .* column|schema cache/i.test(message)) {
+    return `${context} needs the probe-workflow migration (0002) before this deployment can store it.`;
+  }
+  if (code === "23514") {
+    return `${context} is not one of the states this deployment allows. The instructor-workflows migration (0010) extends the allowed states.`;
+  }
+  if (code === "PGRST202" || /Could not find the function/i.test(message)) {
+    return `${context} is not available on this deployment yet. It arrives with the pending database migration.`;
+  }
+  return message;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -86,7 +126,7 @@ export async function signup(formData: FormData): Promise<ActionResult> {
     if (message.includes("rate limit")) {
       return {
         error:
-          "Supabase is rate-limiting email sends. In the Supabase dashboard go to Authentication → Settings, turn OFF 'Enable email confirmation', save, then try again.",
+          "Supabase is rate-limiting email sends. In the Supabase dashboard go to Authentication â†’ Settings, turn OFF 'Enable email confirmation', save, then try again.",
       };
     }
     return { error: `Signup failed: ${String(error.message)}` };
@@ -94,7 +134,7 @@ export async function signup(formData: FormData): Promise<ActionResult> {
 
   if (!data.user || !data.session) {
     return {
-      info: "Check your email to confirm your account, then log in. If the email never arrives, turn off 'Enable email confirmation' in the Supabase dashboard (Authentication → Settings).",
+      info: "Check your email to confirm your account, then log in. If the email never arrives, turn off 'Enable email confirmation' in the Supabase dashboard (Authentication â†’ Settings).",
     };
   }
 
@@ -110,7 +150,132 @@ export async function logout(): Promise<void> {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Claims — "I am taking responsibility for this activity"                     */
+/* Instructor-managed developer accounts                                      */
+/* -------------------------------------------------------------------------- */
+
+const DEVELOPER_PATHWAYS: PathwayId[] = [
+  "builder",
+  "problem-solver",
+  "teacher",
+  "mentor",
+  "scout",
+];
+
+export async function inviteDeveloper(formData: FormData): Promise<ActionResult> {
+  await requireInstructor();
+
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const fullName = String(formData.get("fullName") ?? "").trim();
+  const handle = String(formData.get("handle") ?? "").trim().toLowerCase();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Enter a valid email address." };
+  }
+  if (email.split("@")[1] === "uncommon.org") {
+    return { error: "That email domain is reserved for instructor accounts." };
+  }
+  if (!fullName || fullName.length > 100) {
+    return { error: "Enter a name no longer than 100 characters." };
+  }
+  if (handle && !/^[a-z0-9][a-z0-9_-]{1,29}$/.test(handle)) {
+    return { error: "Handle must be 2â€“30 characters using letters, numbers, _ or -." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.inviteUserByEmail(email, {
+    data: {
+      full_name: fullName,
+      ...(handle ? { handle } : {}),
+    },
+  });
+  if (error) return { error: `Could not invite developer: ${error.message}` };
+
+  revalidatePath("/instructor/developers");
+  return {
+    ok: true,
+    info: `Invitation sent to ${email}. Their developer profile was created automatically.`,
+  };
+}
+
+export async function updateDeveloper(
+  developerId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  await requireInstructor();
+
+  const fullName = String(formData.get("fullName") ?? "").trim();
+  const handle = String(formData.get("handle") ?? "").trim().toLowerCase();
+  const headline = String(formData.get("headline") ?? "").trim();
+  const primaryPathway = String(formData.get("primaryPathway") ?? "");
+
+  if (!developerId) return { error: "Unknown developer." };
+  if (!fullName || fullName.length > 100) {
+    return { error: "Enter a name no longer than 100 characters." };
+  }
+  if (!/^[a-z0-9][a-z0-9_-]{1,29}$/.test(handle)) {
+    return { error: "Handle must be 2â€“30 characters using letters, numbers, _ or -." };
+  }
+  if (headline.length > 160) {
+    return { error: "Headline must be 160 characters or fewer." };
+  }
+  const pathway = DEVELOPER_PATHWAYS.find((candidate) => candidate === primaryPathway);
+  if (!pathway) {
+    return { error: "Choose a valid pathway." };
+  }
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("profiles")
+    .update({
+      full_name: fullName,
+      handle,
+      headline,
+      primary_pathway: pathway,
+    })
+    .eq("id", developerId)
+    .eq("role", "developer")
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { error: `Could not update developer: ${error.message}` };
+  if (!data) return { error: "Developer not found or no longer has developer access." };
+
+  revalidatePath("/instructor/developers");
+  revalidatePath("/");
+  return { ok: true, info: "Developer profile updated." };
+}
+
+export async function deleteDeveloper(developerId: string): Promise<ActionResult> {
+  const instructor = await requireInstructor();
+
+  if (!developerId || developerId === instructor.userId) {
+    return { error: "You cannot delete your own account." };
+  }
+
+  const admin = createAdminClient();
+  const { data: profile, error: profileError } = await admin
+    .from("profiles")
+    .select("id, role")
+    .eq("id", developerId)
+    .maybeSingle();
+
+  if (profileError) {
+    return { error: `Could not verify developer account: ${profileError.message}` };
+  }
+  if (!profile || profile.role !== "developer") {
+    return { error: "Developer not found or account is not a developer." };
+  }
+
+  const { error } = await admin.auth.admin.deleteUser(developerId);
+  if (error) return { error: `Could not delete developer account: ${error.message}` };
+
+  revalidatePath("/instructor/developers");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Claims â€” "I am taking responsibility for this activity"                     */
 /* -------------------------------------------------------------------------- */
 
 export async function claim(
@@ -119,6 +284,23 @@ export async function claim(
 ): Promise<ActionResult> {
   const session = await requireSession();
   const supabase = await createClient();
+
+  if (await isInstructor(session.userId)) {
+    return { error: "Instructor accounts cannot claim developer activities." };
+  }
+
+  const table = kind === "challenge" ? "challenges" : "teaching_proposals";
+  const { data: activity, error: activityError } = await supabase
+    .from(table)
+    .select("status")
+    .eq("id", activityId)
+    .maybeSingle();
+  const claimableStatuses =
+    kind === "challenge" ? ["open"] : ["open", "scheduled", "delivered"];
+  if (activityError) return { error: `Could not check activity status: ${activityError.message}` };
+  if (!activity || !claimableStatuses.includes(activity.status)) {
+    return { error: "This activity is not currently available to claim." };
+  }
 
   const { error } = await supabase.from("activity_claims").insert({
     kind,
@@ -140,6 +322,9 @@ export async function unclaim(
   activityId: string,
 ): Promise<ActionResult> {
   const session = await requireSession();
+  if (await isInstructor(session.userId)) {
+    return { error: "Instructor accounts cannot change developer claims." };
+  }
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -154,11 +339,14 @@ export async function unclaim(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Problem submissions — XP is suggested by the problem row, never the form    */
+/* Problem submissions â€” XP is suggested by the problem row, never the form    */
 /* -------------------------------------------------------------------------- */
 
 export async function submitProblem(formData: FormData): Promise<ActionResult> {
   const session = await requireSession();
+  if (await isInstructor(session.userId)) {
+    return { error: "Instructor accounts cannot submit developer solutions." };
+  }
   const challengeId = String(formData.get("challengeId") ?? "");
   const solution = String(formData.get("solution") ?? "").trim();
   const evidence = String(formData.get("evidence") ?? "");
@@ -178,6 +366,9 @@ export async function submitProblem(formData: FormData): Promise<ActionResult> {
     .eq("id", challengeId)
     .single();
   if (challengeError || !challenge) return { error: "Unknown problem." };
+  if (challenge.status !== "open") {
+    return { error: "This problem is closed to new submissions." };
+  }
 
   /* The claim is the smallest mechanism the schema supports: you submit
      evidence for a problem you took responsibility for. */
@@ -210,15 +401,18 @@ export async function submitProblem(formData: FormData): Promise<ActionResult> {
   });
 
   if (error) return { error: "Could not submit. Please try again." };
-  return { ok: true, info: "Submitted. The instructor reviews it next — XP is awarded only on approval." };
+  return { ok: true, info: "Submitted. The instructor reviews it next â€” XP is awarded only on approval." };
 }
 
 /* -------------------------------------------------------------------------- */
-/* Topic presentations — same review artifact, paid in the teacher pathway     */
+/* Topic presentations â€” same review artifact, paid in the teacher pathway     */
 /* -------------------------------------------------------------------------- */
 
 export async function presentTopic(formData: FormData): Promise<ActionResult> {
   const session = await requireSession();
+  if (await isInstructor(session.userId)) {
+    return { error: "Instructor accounts cannot submit developer presentations." };
+  }
   const topicId = String(formData.get("topicId") ?? "");
   const solution = String(formData.get("solution") ?? "").trim();
   const evidence = String(formData.get("evidence") ?? "");
@@ -235,6 +429,9 @@ export async function presentTopic(formData: FormData): Promise<ActionResult> {
     .eq("id", topicId)
     .single();
   if (topicError || !topic) return { error: "Unknown topic." };
+  if (topic.status === "draft" || topic.status === "archived") {
+    return { error: "This topic is not currently available for presentations." };
+  }
 
   const { data: existingClaim, error: claimError } = await supabase
     .from("activity_claims")
@@ -288,6 +485,9 @@ export async function submitOpportunity(
   formData: FormData,
 ): Promise<ActionResult> {
   const session = await requireSession();
+  if (await isInstructor(session.userId)) {
+    return { error: "Instructor accounts cannot submit developer opportunities." };
+  }
   const organisation = String(formData.get("organisation") ?? "").trim();
   const role = String(formData.get("role") ?? "").trim();
   const link = String(formData.get("link") ?? "").trim();
@@ -308,8 +508,223 @@ export async function submitOpportunity(
     review_status: "pending",
   });
 
-  if (error) return { error: "Could not submit the opportunity." };
+  if (error) return { error: explainDbError(error, "Submitting an opportunity") };
   return { ok: true, info: "Submitted. The instructor verifies it before it earns XP." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Persistent Probe/help                                                      */
+/* -------------------------------------------------------------------------- */
+
+const PROBE_PATHWAYS = new Set(["builder", "problem-solver", "teacher", "mentor", "scout"]);
+
+function parseProbeTags(value: FormDataEntryValue | null): string[] {
+  return [...new Set(
+    String(value ?? "")
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  )];
+}
+
+export async function createProbe(formData: FormData): Promise<ActionResult> {
+  const session = await requireSession();
+  if (await isInstructor(session.userId)) {
+    return { error: "Instructor accounts cannot create developer probes." };
+  }
+
+  const title = String(formData.get("title") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+  const pathwayId = String(formData.get("pathwayId") ?? "");
+  const urgency = String(formData.get("urgency") ?? "normal");
+  const tags = parseProbeTags(formData.get("tags"));
+  const technologies = parseProbeTags(formData.get("technologies"));
+
+  if (title.length < 5 || title.length > 120) {
+    return { error: "Title must be between 5 and 120 characters." };
+  }
+  if (body.length < 20 || body.length > 5000) {
+    return { error: "Describe the problem in 20 to 5000 characters." };
+  }
+  if (!PROBE_PATHWAYS.has(pathwayId)) {
+    return { error: "Choose a valid pathway." };
+  }
+  if (urgency !== "normal" && urgency !== "blocking") {
+    return { error: "Choose a valid urgency." };
+  }
+  if (tags.length > 8 || tags.some((tag) => tag.length > 40)) {
+    return { error: "Use up to 8 tags, each no longer than 40 characters." };
+  }
+  if (technologies.length > 8 || technologies.some((tag) => tag.length > 40)) {
+    return { error: "Use up to 8 technologies, each no longer than 40 characters." };
+  }
+
+  const supabase = await createClient();
+
+  /* The workflow columns (urgency, tags, technologies, flagged) arrive with
+     the probe migration. Write only what this deployment holds. */
+  const values: Record<string, unknown> = {
+    developer_id: session.userId,
+    title,
+    body,
+    pathway_id: pathwayId,
+    status: "open",
+  };
+  if (await supportsProbeColumns()) {
+    values.urgency = urgency;
+    values.tags = tags;
+    values.technologies = technologies;
+    values.flagged = false;
+  }
+
+  const { data, error } = await supabase
+    .from("help_requests")
+    .insert(values)
+    .select("id")
+    .single();
+  if (error) return { error: explainDbError(error, "Creating a Probe") };
+
+  revalidatePath("/probe");
+  return { ok: true, info: `Probe posted. Open it at /probe/${data.id}.` };
+}
+
+export async function acceptProbe(requestId: string): Promise<ActionResult> {
+  const session = await requireSession();
+  if (await isInstructor(session.userId)) {
+    return { error: "Instructor accounts cannot accept developer probes." };
+  }
+  if (!requestId) return { error: "Probe not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("accept_probe", { p_request_id: requestId });
+  if (error) return { error: explainDbError(error, "Accepting a Probe") };
+
+  revalidatePath("/probe");
+  revalidatePath(`/probe/${requestId}`);
+  return { ok: true, info: "You are now helping with this Probe." };
+}
+
+export async function releaseProbe(requestId: string): Promise<ActionResult> {
+  const session = await requireSession();
+  if (await isInstructor(session.userId)) {
+    return { error: "Instructor accounts cannot release developer probes." };
+  }
+  if (!requestId) return { error: "Probe not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("release_probe", { p_request_id: requestId });
+  if (error) return { error: explainDbError(error, "Releasing a Probe") };
+
+  revalidatePath("/probe");
+  revalidatePath(`/probe/${requestId}`);
+  return { ok: true, info: "Probe released back to the board." };
+}
+
+export async function respondToProbe(
+  requestId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await requireSession();
+  if (await isInstructor(session.userId)) {
+    return { error: "Instructor accounts cannot answer developer probes." };
+  }
+  const body = String(formData.get("body") ?? "").trim();
+  if (!requestId) return { error: "Probe not found." };
+  if (body.length < 20 || body.length > 5000) {
+    return { error: "Answer must be between 20 and 5000 characters." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("help_answers").insert({
+    request_id: requestId,
+    author_id: session.userId,
+    body,
+  });
+  if (error) return { error: explainDbError(error, "Posting an answer") };
+
+  revalidatePath(`/probe/${requestId}`);
+  revalidatePath("/probe");
+  return { ok: true, info: "Answer posted." };
+}
+
+export async function confirmProbeAnswer(
+  requestId: string,
+  answerId: string,
+): Promise<ActionResult> {
+  const session = await requireSession();
+  if (await isInstructor(session.userId)) {
+    return { error: "Instructor accounts cannot confirm developer probe answers." };
+  }
+  if (!requestId || !answerId) return { error: "Choose an answer on this Probe." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("confirm_probe_answer", {
+    p_request_id: requestId,
+    p_answer_id: answerId,
+  });
+  if (error) return { error: explainDbError(error, "Confirming an answer") };
+
+  revalidatePath(`/probe/${requestId}`);
+  revalidatePath("/probe");
+  return { ok: true, info: "Answer confirmed. The helper received 8 Mentor XP." };
+}
+
+export async function flagProbe(
+  requestId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await requireSession();
+  if (await isInstructor(session.userId)) {
+    return { error: "Instructor accounts review reports; only developers can report probes." };
+  }
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!requestId) return { error: "Probe not found." };
+  if (reason.length < 5 || reason.length > 1000) {
+    return { error: "Explain the privacy concern in 5 to 1000 characters." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("flag_probe", {
+    p_request_id: requestId,
+    p_reason: reason,
+  });
+  if (error) return { error: explainDbError(error, "Reporting a Probe") };
+
+  revalidatePath("/probe");
+  revalidatePath(`/probe/${requestId}`);
+  revalidatePath("/instructor/probes");
+  revalidatePath("/instructor");
+  return { ok: true, info: "Reported privately to the instructor." };
+}
+
+export async function moderateProbe(
+  requestId: string,
+  flagged: boolean,
+  reason = "",
+): Promise<ActionResult> {
+  await requireInstructor();
+  const cleanReason = reason.trim();
+  if (!requestId) return { error: "Probe not found." };
+  if (flagged && (cleanReason.length < 5 || cleanReason.length > 1000)) {
+    return { error: "A moderation reason must be 5 to 1000 characters." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("moderate_probe", {
+    p_request_id: requestId,
+    p_flagged: flagged,
+    p_reason: flagged ? cleanReason : null,
+  });
+  if (error) return { error: explainDbError(error, "Moderating a Probe") };
+
+  revalidatePath("/instructor/probes");
+  revalidatePath("/probe");
+  revalidatePath(`/probe/${requestId}`);
+  revalidatePath("/instructor");
+  return {
+    ok: true,
+    info: flagged ? "Probe remains restricted pending review." : "Probe is no longer flagged.",
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -437,7 +852,7 @@ export async function updateProblem(id: string, formData: FormData): Promise<Act
 
   revalidatePath("/instructor/challenges");
   revalidatePath("/arena");
-  revalidatePath(`/arena/${id}`);
+  revalidatePath("/arena/[challengeId]", "page");
   return { ok: true, info: "Problem updated." };
 }
 
@@ -464,37 +879,199 @@ export async function deleteProblem(id: string): Promise<ActionResult> {
 
   revalidatePath("/instructor/challenges");
   revalidatePath("/arena");
-  revalidatePath(`/arena/${id}`);
+  revalidatePath("/arena/[challengeId]", "page");
   return { ok: true, info: "Problem deleted." };
 }
 
 export async function createTopic(formData: FormData): Promise<ActionResult> {
-  await requireInstructor();
+  const instructor = await requireInstructor();
   const title = String(formData.get("title") ?? "").trim();
   const summary = String(formData.get("summary") ?? "").trim();
   const pathwayId = String(formData.get("pathwayId") ?? "teacher");
   const xpReward = Number(formData.get("xpReward") ?? 40);
+  const status = String(formData.get("status") ?? "open");
+  const pathways: PathwayId[] = ["builder", "problem-solver", "teacher", "mentor", "scout"];
+  const pathway = pathways.find((candidate) => candidate === pathwayId);
 
-  if (!title) return { error: "A title is required." };
-  if (!summary) return { error: "A summary is required." };
-  if (!Number.isFinite(xpReward) || xpReward < 5 || xpReward > 500) {
-    return { error: "XP reward must be between 5 and 500." };
+  if (!title || title.length > 200) {
+    return { error: "Topic title is required and must be 200 characters or fewer." };
+  }
+  if (!summary || summary.length > 5000) {
+    return { error: "Topic summary is required and must be 5,000 characters or fewer." };
+  }
+  if (!pathway) {
+    return { error: "Choose a valid pathway." };
+  }
+  if (!Number.isInteger(xpReward) || xpReward < 5 || xpReward > 500) {
+    return { error: "XP reward must be a whole number between 5 and 500." };
+  }
+  if (status !== "open" && status !== "draft") {
+    return { error: "Choose whether to publish or save this topic as a draft." };
   }
 
-  const session = await getSession();
   const supabase = await createClient();
   const { error } = await supabase.from("teaching_proposals").insert({
     title,
-    pathway_id: pathwayId,
-    proposed_by: session?.userId ?? "",
+    pathway_id: pathway,
+    proposed_by: instructor.userId,
     summary,
     outcomes: ["Presentation reviewed by the instructor"],
     xp_reward: xpReward,
-    status: "open",
+    status,
   });
 
-  if (error) return { error: "Could not create the topic." };
-  return { ok: true, info: "Topic published. Developers can claim and present it." };
+  if (error) return { error: explainDbError(error, "Creating a topic") };
+  revalidatePath("/instructor/topics");
+  revalidatePath("/topics");
+  return {
+    ok: true,
+    info:
+      status === "draft"
+        ? "Topic saved as a draft. Developers cannot see it until you publish it."
+        : "Topic published. Developers can claim and present it.",
+  };
+}
+
+export async function updateTopic(
+  topicId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const instructor = await requireInstructor();
+
+  const title = String(formData.get("title") ?? "").trim();
+  const summary = String(formData.get("summary") ?? "").trim();
+  const pathwayId = String(formData.get("pathwayId") ?? "");
+  const xpReward = Number(formData.get("xpReward"));
+  const status = String(formData.get("status") ?? "");
+  const outcomes = String(formData.get("outcomes") ?? "")
+    .split("\n")
+    .map((outcome) => outcome.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+  const sessionDateInput = String(formData.get("sessionDate") ?? "").trim();
+  const pathways: PathwayId[] = ["builder", "problem-solver", "teacher", "mentor", "scout"];
+  const pathway = pathways.find((candidate) => candidate === pathwayId);
+  const statuses = ["draft", "open", "scheduled", "delivered", "archived"] as const;
+  const validStatus = statuses.find((candidate) => candidate === status);
+  const sessionDate = sessionDateInput ? new Date(sessionDateInput) : null;
+
+  if (!topicId) return { error: "Unknown topic proposal." };
+  if (!title || title.length > 200) {
+    return { error: "Topic title is required and must be 200 characters or fewer." };
+  }
+  if (!summary || summary.length > 5000) {
+    return { error: "Topic summary is required and must be 5,000 characters or fewer." };
+  }
+  if (!pathway) return { error: "Choose a valid pathway." };
+  if (!Number.isInteger(xpReward) || xpReward < 5 || xpReward > 500) {
+    return { error: "XP reward must be between 5 and 500." };
+  }
+  if (!validStatus) return { error: "Choose a valid topic status." };
+  if (sessionDateInput && (!sessionDate || Number.isNaN(sessionDate.getTime()))) {
+    return { error: "Enter a valid session date and time." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("teaching_proposals")
+    .update({
+      title,
+      summary,
+      pathway_id: pathway,
+      xp_reward: xpReward,
+      status: validStatus,
+      outcomes,
+      session_date: sessionDate?.toISOString() ?? null,
+      reviewed_by: instructor.userId,
+    })
+    .eq("id", topicId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { error: explainDbError(error, "Updating a topic") };
+  if (!data) {
+    return {
+      error: "Topic was not updated. It may have been deleted or instructor edit permission is missing.",
+    };
+  }
+
+  revalidatePath("/instructor/topics");
+  revalidatePath("/topics");
+  revalidatePath("/teach");
+  return { ok: true, info: "Topic updated." };
+}
+
+export async function deleteTopic(topicId: string): Promise<ActionResult> {
+  await requireInstructor();
+  if (!topicId.trim()) return { error: "Unknown topic." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("teaching_proposals")
+    .delete()
+    .eq("id", topicId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { error: `Could not delete topic (${error.code}): ${error.message}` };
+  }
+  if (!data) {
+    return {
+      error:
+        "Topic was not deleted. It may already be gone, have submissions, or require migration 0010_instructor_workflows.sql for instructor delete permission.",
+    };
+  }
+
+  revalidatePath("/instructor/topics");
+  revalidatePath("/topics");
+  revalidatePath("/teach");
+  return { ok: true, info: "Topic deleted." };
+}
+
+export async function proposeTopic(formData: FormData): Promise<ActionResult> {
+  const session = await requireSession();
+  if (await isInstructor(session.userId)) {
+    return { error: "Only developer accounts can propose topics." };
+  }
+
+  const title = String(formData.get("title") ?? "").trim();
+  const summary = String(formData.get("summary") ?? "").trim();
+  const pathwayId = String(formData.get("pathwayId") ?? "");
+  const pathways: PathwayId[] = ["builder", "problem-solver", "teacher", "mentor", "scout"];
+  const pathway = pathways.find((candidate) => candidate === pathwayId);
+
+  if (title.length < 6 || title.length > 200) {
+    return { error: "Topic title must be between 6 and 200 characters." };
+  }
+  if (summary.length < 20 || summary.length > 5000) {
+    return { error: "Topic summary must be between 20 and 5,000 characters." };
+  }
+  if (!pathway) {
+    return { error: "Choose a valid pathway." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("teaching_proposals")
+    .insert({
+      title,
+      pathway_id: pathway,
+      proposed_by: session.userId,
+      summary,
+      outcomes: [],
+      status: "draft",
+      xp_reward: 60,
+    })
+    .select("id")
+    .single();
+
+  if (error) return { error: explainDbError(error, "Submitting a topic proposal") };
+  if (!data) return { error: "The topic proposal was not saved. Please try again." };
+
+  revalidatePath("/topics");
+  revalidatePath("/instructor/topics");
+  return { ok: true, info: "Topic proposal sent to the instructor for review." };
 }
 
 export async function reviewSubmission(
@@ -503,24 +1080,37 @@ export async function reviewSubmission(
   awardedXp: number,
   note: string,
 ): Promise<ActionResult> {
-  await requireInstructor();
+  const instructor = await requireInstructor();
 
   if (!submissionId) return { error: "Unknown submission." };
-  const xp = Math.max(0, Math.floor(Number(awardedXp) || 0));
-  if ((status === "approved" || status === "adjusted") && xp <= 0) {
-    return { error: "Approval must award at least 1 XP." };
+  if (!["approved", "adjusted", "returned"].includes(status)) {
+    return { error: "Choose a valid review outcome." };
+  }
+  const xp = Number(awardedXp);
+  if (
+    (status === "approved" || status === "adjusted") &&
+    (!Number.isInteger(xp) || xp < 1 || xp > 1000)
+  ) {
+    return { error: "Approval must award between 1 and 1,000 whole XP." };
+  }
+  if (note.length > 1000) {
+    return { error: "The reviewer note must be 1,000 characters or fewer." };
   }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("review_submission", {
     p_submission_id: submissionId,
-    p_reviewer_id: (await getSession())?.userId ?? "",
+    p_reviewer_id: instructor.userId,
     p_status: status,
     p_awarded_xp: status === "returned" ? 0 : xp,
     p_note: note.trim(),
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: explainDbError(error, "Reviewing a submission") };
+  revalidatePath("/instructor/review-queue");
+  revalidatePath("/instructor");
+  revalidatePath("/");
+  revalidatePath("/leaderboard");
   return {
     ok: true,
     info:
@@ -538,47 +1128,34 @@ export async function reviewOpportunity(
 ): Promise<ActionResult> {
   await requireInstructor();
 
+  if (!opportunityId.trim()) return { error: "Unknown opportunity." };
+  if (decision !== "approve" && decision !== "reject") {
+    return { error: "Choose a valid verification decision." };
+  }
+  const xp = Number(awardedXp);
+  if (!Number.isInteger(xp) || xp < 0 || xp > 500) {
+    return { error: "Verification XP must be a whole number between 0 and 500." };
+  }
+  if (decision === "reject" && xp !== 0) {
+    return { error: "Rejected opportunities cannot award XP." };
+  }
+  if (note.length > 1000) {
+    return { error: "The review note must be 1,000 characters or fewer." };
+  }
+
   const supabase = await createClient();
-  const { data: opportunity, error: opportunityError } = await supabase
-    .from("opportunities")
-    .select("id, submitted_by, review_status")
-    .eq("id", opportunityId)
-    .single();
+  const { error } = await supabase.rpc("review_opportunity", {
+    p_opportunity_id: opportunityId,
+    p_decision: decision,
+    p_awarded_xp: xp,
+    p_note: note.trim(),
+  });
+  if (error) return { error: explainDbError(error, "Verifying an opportunity") };
 
-  if (opportunityError || !opportunity || opportunity.review_status !== "pending") {
-    return { error: "This opportunity is no longer pending." };
-  }
-
-  const xp = Math.max(0, Math.floor(Number(awardedXp) || 0));
-  const session = await getSession();
-
-  const { error: updateError } = await supabase
-    .from("opportunities")
-    .update({
-      review_status: decision === "approve" ? "approved" : "rejected",
-      verification: decision === "approve" ? "verified" : "unverified",
-      review_note: note.trim(),
-      reviewed_by: session?.userId ?? null,
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", opportunityId);
-
-  if (updateError) return { error: "Could not record the decision." };
-
-  /* XP flows through the instructor-gated engine — never a direct write. */
-  if (decision === "approve" && xp > 0 && opportunity.submitted_by) {
-    const { error: xpError } = await supabase.rpc("award_xp", {
-      p_developer_id: opportunity.submitted_by,
-      p_pathway_id: "scout",
-      p_source: "scout",
-      p_xp: xp,
-      p_label: "Opportunity verified",
-      p_detail: note.trim() || "Your opportunity submission was verified.",
-      p_reference_id: opportunityId,
-    });
-    if (xpError) return { error: xpError.message };
-  }
-
+  revalidatePath("/instructor/opportunities");
+  revalidatePath("/opportunities");
+  revalidatePath("/");
+  revalidatePath("/leaderboard");
   return {
     ok: true,
     info:
@@ -586,6 +1163,125 @@ export async function reviewOpportunity(
         ? `Verified.${xp > 0 ? ` ${xp} XP awarded.` : ""}`
         : "Rejected. No XP awarded.",
   };
+}
+
+export async function saveCuratedOpportunity(formData: FormData): Promise<ActionResult> {
+  await requireInstructor();
+
+  const opportunityId = String(formData.get("opportunityId") ?? "").trim();
+  const organisation = String(formData.get("organisation") ?? "").trim();
+  const role = String(formData.get("role") ?? "").trim();
+  const summary = String(formData.get("summary") ?? "").trim();
+  const type = String(formData.get("type") ?? "").trim();
+  const location = String(formData.get("location") ?? "").trim();
+  const applyUrl = String(formData.get("applyUrl") ?? "").trim();
+  const closesAtInput = String(formData.get("closesAt") ?? "").trim();
+  const listingState = String(formData.get("listingState") ?? "");
+  const validStates = ["draft", "published", "archived"] as const;
+  const validState = validStates.find((candidate) => candidate === listingState);
+  const closesAt = closesAtInput ? new Date(closesAtInput) : null;
+
+  if (!organisation || organisation.length > 160) {
+    return { error: "Organisation is required and must be 160 characters or fewer." };
+  }
+  if (!role || role.length > 200) {
+    return { error: "Role or title is required and must be 200 characters or fewer." };
+  }
+  if (!summary || summary.length > 5000) {
+    return { error: "Description is required and must be 5,000 characters or fewer." };
+  }
+  if (!type || type.length > 80) {
+    return { error: "Opportunity type is required and must be 80 characters or fewer." };
+  }
+  if (location.length > 160) {
+    return { error: "Location must be 160 characters or fewer." };
+  }
+  if (applyUrl.length > 2000) {
+    return { error: "Application link must be 2,000 characters or fewer." };
+  }
+  if (applyUrl) {
+    try {
+      const parsedUrl = new URL(applyUrl);
+      if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+        return { error: "Apply link must use http or https." };
+      }
+    } catch {
+      return { error: "Enter a valid apply link." };
+    }
+  }
+  if (closesAtInput && (!closesAt || Number.isNaN(closesAt.getTime()))) {
+    return { error: "Enter a valid closing date and time." };
+  }
+  if (!validState) return { error: "Choose a valid listing state." };
+
+  const supabase = await createClient();
+  const values: Record<string, unknown> = {
+    organisation,
+    role,
+    summary,
+    type,
+    location,
+    apply_url: applyUrl,
+    closes_at: closesAt?.toISOString() ?? null,
+    submitted_by: null,
+    review_status: "approved",
+    verification: "verified",
+    xp_reward: 0,
+  };
+  /* `listing_state` arrives with the instructor-workflows migration. Without
+     it a curated listing is simply a published listing. */
+  if (await supportsListingState()) {
+    values.listing_state = validState;
+  }
+  const result = opportunityId
+    ? await supabase
+        .from("opportunities")
+        .update(values)
+        .eq("id", opportunityId)
+        .is("submitted_by", null)
+        .select("id")
+        .maybeSingle()
+    : await supabase.from("opportunities").insert(values).select("id").maybeSingle();
+
+  if (result.error) {
+    return { error: explainDbError(result.error, "Saving a curated opportunity") };
+  }
+  if (!result.data) {
+    return { error: "Curated opportunity not found or no longer available to edit." };
+  }
+
+  revalidatePath("/instructor/opportunities");
+  revalidatePath("/opportunities");
+  return {
+    ok: true,
+    info: opportunityId ? "Curated opportunity updated." : "Curated opportunity added.",
+  };
+}
+
+export async function deleteCuratedOpportunity(
+  opportunityId: string,
+): Promise<ActionResult> {
+  await requireInstructor();
+  if (!opportunityId.trim()) return { error: "Unknown opportunity." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("opportunities")
+    .delete()
+    .eq("id", opportunityId)
+    .is("submitted_by", null)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    return { error: `Could not delete curated opportunity: ${error.message}` };
+  }
+  if (!data) {
+    return { error: "Curated opportunity not found or no longer available to delete." };
+  }
+
+  revalidatePath("/instructor/opportunities");
+  revalidatePath("/opportunities");
+  return { ok: true, info: "Curated opportunity deleted." };
 }
 
 export async function requestDevShopReward(
@@ -605,7 +1301,7 @@ export async function requestDevShopReward(
     p_request_note: requestNote.trim(),
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: explainDbError(error, "Requesting a reward") };
   revalidatePath("/dev-shop");
   return { ok: true, info: "Request sent to the instructor." };
 }
@@ -652,15 +1348,15 @@ export async function saveDevShopReward(formData: FormData): Promise<ActionResul
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/(^-|-$)/g, "")
-            .slice(0, 48) || `reward-${Date.now()}`,
-        sort_order: Date.now(),
+            .slice(0, 48) || `reward-${Math.floor(Date.now() / 1000)}`,
+        sort_order: Math.floor(Date.now() / 1000),
       });
 
   if (result.error) {
     if (result.error.code === "23505") {
       return { error: "A reward with that name already exists. Edit the existing reward instead." };
     }
-    return { error: `Could not save reward (${result.error.code}): ${result.error.message}` };
+    return { error: explainDbError(result.error, "Saving a reward") };
   }
 
   revalidatePath("/instructor/dev-shop");
@@ -709,7 +1405,7 @@ export async function reviewDevShopRedemption(
     p_instructor_note: instructorNote.trim(),
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: explainDbError(error, "Reviewing a Dev Shop request") };
   revalidatePath("/instructor/dev-shop");
   revalidatePath("/dev-shop");
   return { ok: true, info: "Shop request updated." };
@@ -727,7 +1423,7 @@ export async function markNotificationsRead(): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** Used by the instructor "developers" view — one submission row shape. */
+/** Used by the instructor "developers" view â€” one submission row shape. */
 export type { SubmissionRow };
 
 /* -------------------------------------------------------------------------- */
@@ -818,4 +1514,315 @@ export async function deleteProfileImage(): Promise<ActionResult> {
   }
 
   return { ok: true, info: "Profile image removed." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Topic interest                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Interest in a topic proposal. `proposal_votes` already exists with the
+ * "vote once" and "retract own vote" policies, so the write needs no schema
+ * change â€” the client may only ever write its own row.
+ */
+export async function voteTopicProposal(proposalId: string): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!proposalId.trim()) return { error: "Unknown topic proposal." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("proposal_votes").insert({
+    proposal_id: proposalId,
+    voter_id: session.userId,
+  });
+
+  if (error) {
+    if (String(error.code) === "23505") {
+      return { info: "You have already shown interest in this topic." };
+    }
+    return { error: `Could not record your interest: ${error.message}` };
+  }
+
+  revalidatePath("/topics");
+  revalidatePath("/instructor/topics");
+  return { ok: true, info: "Interest recorded. The instructor sees the count." };
+}
+
+export async function retractTopicVote(proposalId: string): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!proposalId.trim()) return { error: "Unknown topic proposal." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("proposal_votes")
+    .delete()
+    .eq("proposal_id", proposalId)
+    .eq("voter_id", session.userId);
+
+  if (error) return { error: `Could not withdraw your interest: ${error.message}` };
+
+  revalidatePath("/topics");
+  revalidatePath("/instructor/topics");
+  return { ok: true, info: "Interest withdrawn." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Inline lifecycle actions                                                     */
+/* -------------------------------------------------------------------------- */
+
+const PROBLEM_STATUS_VALUES = ["open", "locked", "closed", "draft"] as const;
+type ProblemStatus = (typeof PROBLEM_STATUS_VALUES)[number];
+
+/**
+ * Change a problem's visibility without opening the full editor. The
+ * instructor policy on `challenges` is the boundary; the browser cannot
+ * change anything else about the row.
+ */
+export async function setProblemStatus(
+  id: string,
+  status: string,
+): Promise<ActionResult> {
+  await requireInstructor();
+  if (!id.trim()) return { error: "Unknown problem." };
+  if (!PROBLEM_STATUS_VALUES.includes(status as ProblemStatus)) {
+    return { error: "Choose a valid problem status." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("challenges").update({ status }).eq("id", id);
+  if (error) {
+    return { error: explainDbError(error, "Changing the problem status") };
+  }
+
+  revalidatePath("/instructor/challenges");
+  revalidatePath("/arena");
+  revalidatePath("/arena/[challengeId]", "page");
+  return { ok: true, info: `Problem is now ${status}.` };
+}
+
+const TOPIC_STATUSES = ["draft", "open", "scheduled", "delivered", "archived"] as const;
+type TopicStatus = (typeof TOPIC_STATUSES)[number];
+
+/**
+ * Publish, schedule or archive a topic. This is also how a developer proposal
+ * becomes a topic the team can claim: the instructor moves it out of `draft`.
+ */
+export async function setTopicStatus(
+  topicId: string,
+  status: string,
+): Promise<ActionResult> {
+  const instructor = await requireInstructor();
+  if (!topicId.trim()) return { error: "Unknown topic." };
+  if (!TOPIC_STATUSES.includes(status as TopicStatus)) {
+    return { error: "Choose a valid topic status." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("teaching_proposals")
+    .update({ status, reviewed_by: instructor.userId })
+    .eq("id", topicId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { error: explainDbError(error, "Changing the topic status") };
+  }
+  if (!data) return { error: "Topic not found, or it is not yours to change." };
+
+  revalidatePath("/instructor/topics");
+  revalidatePath("/topics");
+  revalidatePath("/teach");
+  return {
+    ok: true,
+    info:
+      status === "archived"
+        ? "Topic archived. It no longer appears on the topics board."
+        : `Topic is now ${status}.`,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Unlock grants                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Grants a responsibility. `developer_unlocks` has no instructor write
+ * policy, so this runs through the service-role client â€” the same privileged
+ * path the developer roster uses. The catalogue itself stays read-only.
+ */
+export async function grantUnlock(
+  developerId: string,
+  unlockId: string,
+): Promise<ActionResult> {
+  await requireInstructor();
+  if (!developerId.trim()) return { error: "Unknown developer." };
+  if (!unlockId.trim()) return { error: "Unknown unlock." };
+
+  const admin = createAdminClient();
+
+  const { data: unlock, error: unlockError } = await admin
+    .from("unlocks")
+    .select("id")
+    .eq("id", unlockId)
+    .maybeSingle();
+  if (unlockError) {
+    return { error: `Could not verify the unlock: ${unlockError.message}` };
+  }
+  if (!unlock) return { error: "That unlock does not exist." };
+
+  const { data: developer, error: developerError } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("id", developerId)
+    .maybeSingle();
+  if (developerError) {
+    return { error: `Could not verify the developer: ${developerError.message}` };
+  }
+  if (!developer) return { error: "That developer does not exist." };
+
+  const { error } = await admin
+    .from("developer_unlocks")
+    .upsert(
+      { developer_id: developerId, unlock_id: unlockId },
+      { onConflict: "developer_id,unlock_id" },
+    );
+  if (error) {
+    return { error: `Could not grant the unlock (${error.code}): ${error.message}` };
+  }
+
+  revalidatePath("/instructor/unlocks");
+  revalidatePath("/instructor/developers");
+  revalidatePath("/profile");
+  return { ok: true, info: "Unlock granted." };
+}
+
+export async function revokeUnlock(
+  developerId: string,
+  unlockId: string,
+): Promise<ActionResult> {
+  await requireInstructor();
+  if (!developerId.trim()) return { error: "Unknown developer." };
+  if (!unlockId.trim()) return { error: "Unknown unlock." };
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("developer_unlocks")
+    .delete()
+    .eq("developer_id", developerId)
+    .eq("unlock_id", unlockId);
+
+  if (error) {
+    return { error: `Could not revoke the unlock (${error.code}): ${error.message}` };
+  }
+
+  revalidatePath("/instructor/unlocks");
+  revalidatePath("/instructor/developers");
+  revalidatePath("/profile");
+  return { ok: true, info: "Unlock revoked." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Hub settings and announcements                                              */
+/* -------------------------------------------------------------------------- */
+
+export async function saveHubSettingsAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  await requireInstructor();
+
+  const name = String(formData.get("hubName") ?? "").trim();
+  const reviewWindowDays = Number(formData.get("reviewWindowDays") ?? 0);
+  const sessionLengthMinutes = Number(formData.get("sessionLengthMinutes") ?? 0);
+
+  if (!name || name.length > 120) {
+    return { error: "Hub name is required and must be 120 characters or fewer." };
+  }
+  if (!Number.isInteger(reviewWindowDays) || reviewWindowDays < 1 || reviewWindowDays > 90) {
+    return { error: "The review window must be a whole number of days between 1 and 90." };
+  }
+  if (
+    !Number.isInteger(sessionLengthMinutes) ||
+    sessionLengthMinutes < 15 ||
+    sessionLengthMinutes > 480
+  ) {
+    return { error: "The session length must be a whole number of minutes between 15 and 480." };
+  }
+
+  try {
+    await persistHubSettings({
+      name,
+      reviewWindowDays,
+      sessionLengthMinutes,
+    });
+  } catch (cause) {
+    return {
+      error: `Could not save hub settings: ${
+        cause instanceof Error ? cause.message : "unknown error"
+      }`,
+    };
+  }
+
+  revalidatePath("/instructor/settings");
+  revalidatePath("/");
+  return { ok: true, info: "Hub settings saved." };
+}
+
+export async function saveHubAnnouncement(
+  formData: FormData,
+): Promise<ActionResult> {
+  await requireInstructor();
+
+  const id = String(formData.get("announcementId") ?? "").trim();
+  const headline = String(formData.get("headline") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+
+  if (!headline || headline.length > 140) {
+    return { error: "A headline of up to 140 characters is required." };
+  }
+  if (!body || body.length > 2000) {
+    return { error: "An announcement body of up to 2,000 characters is required." };
+  }
+
+  const existing = await readHubAnnouncements();
+  const previous = id ? existing.find((entry) => entry.id === id) : undefined;
+
+  try {
+    await saveHubAnnouncementRecord({
+      id: previous?.id ?? `ann-${Date.now().toString(36)}`,
+      headline,
+      body,
+      publishedAt: previous?.publishedAt ?? new Date().toISOString(),
+    });
+  } catch (cause) {
+    return {
+      error: `Could not save the announcement: ${
+        cause instanceof Error ? cause.message : "unknown error"
+      }`,
+    };
+  }
+
+  revalidatePath("/instructor/settings");
+  revalidatePath("/");
+  return { ok: true, info: previous ? "Announcement updated." : "Announcement published." };
+}
+
+export async function deleteHubAnnouncement(
+  id: string,
+): Promise<ActionResult> {
+  await requireInstructor();
+  if (!id.trim()) return { error: "Unknown announcement." };
+
+  try {
+    await deleteHubAnnouncementRecord(id);
+  } catch (cause) {
+    return {
+      error: `Could not delete the announcement: ${
+        cause instanceof Error ? cause.message : "unknown error"
+      }`,
+    };
+  }
+
+  revalidatePath("/instructor/settings");
+  revalidatePath("/");
+  return { ok: true, info: "Announcement removed." };
 }

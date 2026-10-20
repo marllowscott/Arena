@@ -1,17 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import * as React from "react";
 import { Clock, HandHelping, MessageSquare, ShieldAlert, Siren } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { PathwayIcon, PATHWAY_ACCENT } from "@/components/shared/pathway-icon";
 import { relativeTime } from "@/lib/format";
-import { NOW_MS, services } from "@/lib/services";
+import { nowMs } from "@/lib/arena/clock";
 import type { HelpRequestDetail } from "@/lib/services/contracts";
 import { cn } from "@/lib/utils";
-import { useDevArena } from "@/hooks/dev-arena-provider";
+import { ProbeActionButton } from "@/components/dev/probe-action-button";
 
 const STATUS: Record<
   HelpRequestDetail["status"],
@@ -25,22 +24,20 @@ const STATUS: Record<
 
 export function ProbeCard({
   request,
+  developerId,
   className,
   isMine = false,
 }: {
   request: HelpRequestDetail;
+  developerId: string;
   className?: string;
   isMine?: boolean;
 }) {
-  const { acceptProbe, releaseProbe, current } = useDevArena();
-  const pathway = services.pathways.byId(request.pathwayId)!;
-  const accent = PATHWAY_ACCENT[pathway.icon];
+  const icon = request.pathwayIcon ?? "lifebuoy";
+  const accent = PATHWAY_ACCENT[icon];
   const status = STATUS[request.status];
-  const author = services.developers.byId(request.developerId);
 
-  const me = current.developer.id;
-  const helper = request.acceptedBy ? services.developers.byId(request.acceptedBy) : null;
-  const iAccepted = request.acceptedBy === me;
+  const iAccepted = request.acceptedBy === developerId;
 
   return (
     <article
@@ -63,22 +60,22 @@ export function ProbeCard({
           {request.flagged ? (
             <Badge tone="primary">
               <ShieldAlert className="size-3" aria-hidden />
-              Instructor flagged
+              Restricted
             </Badge>
           ) : null}
         </div>
         <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-300">
           <Clock className="size-3" aria-hidden />
-          {relativeTime(request.createdAt, NOW_MS)}
+          {relativeTime(request.createdAt, nowMs())}
         </span>
       </div>
 
       <div className="mt-4 flex items-center gap-2">
         <Avatar
-          initials={author?.initials ?? "??"}
-          name={author?.name}
-          from={author?.avatarFrom}
-          to={author?.avatarTo}
+          initials={request.developerInitials}
+          name={request.developerName}
+          from={request.developerAvatarFrom}
+          to={request.developerAvatarTo}
           size="sm"
         />
         <span className="eyebrow">
@@ -102,8 +99,8 @@ export function ProbeCard({
             accent.text,
           )}
         >
-          <PathwayIcon name={pathway.icon} className="size-2.5" />
-          {pathway.shortName}
+          <PathwayIcon name={icon} className="size-2.5" />
+          {request.pathwayShortName ?? request.pathwayId}
         </span>
         {[...request.technologies, ...request.tags].slice(0, 3).map((tag) => (
           <span
@@ -124,8 +121,8 @@ export function ProbeCard({
             <Avatar
               initials={request.acceptedByInitials ?? "??"}
               name={request.acceptedByName ?? undefined}
-              from={helper?.avatarFrom}
-              to={helper?.avatarTo}
+              from={request.acceptedByAvatarFrom ?? undefined}
+              to={request.acceptedByAvatarTo ?? undefined}
               size="sm"
             />
             <div className="min-w-0 flex-1">
@@ -138,14 +135,13 @@ export function ProbeCard({
                   : "One helper per probe"}
               </p>
             </div>
-            {iAccepted ? (
-              <button
-                type="button"
-                onClick={() => releaseProbe(request.id)}
-                className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-300 underline-offset-2 hover:text-ink-500 hover:underline"
+            {iAccepted && request.status === "open" && !request.flagged ? (
+              <ProbeActionButton
+                action={{ kind: "release", requestId: request.id }}
+                variant="ghost"
               >
                 Drop
-              </button>
+              </ProbeActionButton>
             ) : null}
           </div>
         ) : request.status === "open" && !request.flagged ? (
@@ -174,14 +170,13 @@ export function ProbeCard({
                 {iAccepted ? "You are helping" : "Taken"}
               </Badge>
             ) : (
-              <button
-                type="button"
-                onClick={() => acceptProbe(request.id)}
-                className={buttonVariants({ variant: "primary", size: "sm", tone: "tech" })}
+              <ProbeActionButton
+                action={{ kind: "accept", requestId: request.id }}
+                variant="primary"
               >
                 <HandHelping className="size-3.5" aria-hidden />
                 Help
-              </button>
+              </ProbeActionButton>
             )
           ) : null}
         </div>
