@@ -8,6 +8,7 @@ grant select, insert on public.help_requests, public.help_answers to authenticat
 drop policy if exists "asker edits own probe" on public.help_requests;
 
 drop policy if exists "ask for help" on public.help_requests;
+drop policy if exists "developers create probes" on public.help_requests;
 create policy "developers create probes"
   on public.help_requests for insert
   to authenticated
@@ -199,10 +200,22 @@ begin
     (v_helper_id, 'mentor', 'help', 8, 'Confirmed Probe answer',
      'The person who asked confirmed this answer helped.', p_request_id);
 
-  insert into public.pathway_xp (developer_id, pathway_id, xp)
-  values (v_helper_id, 'mentor', 8)
-  on conflict (developer_id, pathway_id)
-  do update set xp = public.pathway_xp.xp + excluded.xp;
+  -- The per-pathway total is materialised only when public.pathway_xp is a
+  -- table. On a deployment where it is the derived view over xp_events the
+  -- row inserted above is already reflected in it, so the write is skipped.
+  if exists (
+    select 1
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public'
+       and c.relname = 'pathway_xp'
+       and c.relkind = 'r'
+  ) then
+    insert into public.pathway_xp (developer_id, pathway_id, xp)
+    values (v_helper_id, 'mentor', 8)
+    on conflict (developer_id, pathway_id)
+    do update set xp = public.pathway_xp.xp + excluded.xp;
+  end if;
 
   update public.profiles
      set total_xp = total_xp + 8,

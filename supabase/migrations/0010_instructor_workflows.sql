@@ -18,12 +18,34 @@ update public.teaching_proposals t
    and t.reviewed_by is null;
 
 drop policy if exists "reference data is public" on public.challenges;
-drop policy if exists "published challenges are readable" on public.challenges;
-create policy "published challenges are readable"
-  on public.challenges for select
-  using (status <> 'draft' or public.is_instructor(auth.uid()));
+
+-- 0012 owns the policy name "published challenges are readable" and ships the
+-- stricter version that hides a challenge once another developer has claimed
+-- it. Postgres OR-combines permissive select policies, so re-creating the
+-- plain draft-only rule here would quietly widen visibility again on a
+-- database that already ran 0012. The rule below is therefore only created
+-- when it is missing: a fresh database still gets a working policy, and a
+-- migrated one keeps 0012's stricter rule.
+do $$
+begin
+  if not exists (
+    select 1
+      from pg_policy p
+      join pg_class c on c.oid = p.polrelid
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public'
+       and c.relname = 'challenges'
+       and p.polname = 'published challenges are readable'
+  ) then
+    create policy "published challenges are readable"
+      on public.challenges for select
+      using (status <> 'draft' or public.is_instructor(auth.uid()));
+  end if;
+end;
+$$;
 
 drop policy if exists "help is readable" on public.help_requests;
+drop policy if exists "visible probes are readable" on public.help_requests;
 create policy "visible probes are readable"
   on public.help_requests for select
   using (
@@ -34,6 +56,7 @@ create policy "visible probes are readable"
   );
 
 drop policy if exists "answers are readable" on public.help_answers;
+drop policy if exists "visible probe answers are readable" on public.help_answers;
 create policy "visible probe answers are readable"
   on public.help_answers for select
   using (
@@ -63,6 +86,7 @@ create policy "ask for help"
   );
 
 drop policy if exists "write own answer" on public.help_answers;
+drop policy if exists "write own accepted probe answer" on public.help_answers;
 create policy "write own accepted probe answer"
   on public.help_answers for insert
   with check (
@@ -80,6 +104,7 @@ create policy "write own accepted probe answer"
 grant insert, update, delete on public.teaching_proposals to authenticated;
 
 drop policy if exists "topics are readable" on public.teaching_proposals;
+drop policy if exists "published topics are readable" on public.teaching_proposals;
 create policy "published topics are readable"
   on public.teaching_proposals for select
   using (
@@ -88,6 +113,7 @@ create policy "published topics are readable"
   );
 
 drop policy if exists "propose own topic" on public.teaching_proposals;
+drop policy if exists "developers propose unpublished topics" on public.teaching_proposals;
 create policy "developers propose unpublished topics"
   on public.teaching_proposals for insert
   with check (
@@ -105,6 +131,7 @@ create policy "instructors manage topics"
   with check (public.is_instructor(auth.uid()));
 
 drop policy if exists "claim your own activity" on public.activity_claims;
+drop policy if exists "claim your own published activity" on public.activity_claims;
 create policy "claim your own published activity"
   on public.activity_claims for insert
   with check (
@@ -131,6 +158,7 @@ create policy "claim your own published activity"
   );
 
 drop policy if exists "create own submission" on public.submissions;
+drop policy if exists "submit own claimed published work" on public.submissions;
 create policy "submit own claimed published work"
   on public.submissions for insert
   with check (
@@ -226,6 +254,7 @@ alter table public.opportunities
 grant insert, update, delete on public.opportunities to authenticated;
 
 drop policy if exists "opportunities are readable" on public.opportunities;
+drop policy if exists "visible opportunities are readable" on public.opportunities;
 create policy "visible opportunities are readable"
   on public.opportunities for select
   using (
