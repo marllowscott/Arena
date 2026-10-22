@@ -37,6 +37,9 @@ subsequent instructor policies.
 9. `0009_instructor_problem_crud.sql` — problem editing and guarded deletion.
 10. `0010_instructor_workflows.sql` — topic lifecycle, curated opportunities, and atomic reviews.
 11. `0011_persistent_probe_workflow.sql` — persisted Probe actions, moderation, and once-only confirmed-answer XP.
+12. `0012_exclusive_challenge_claims.sql` — one claimant per problem and hide claimed problems from other developers.
+13. `0013_instructor_student_submission_crud.sql` — instructor edit/delete controls for student work and cascading problem/topic deletion.
+14. `0014_curated_opportunity_delete.sql` — instructor-authorized curated opportunity deletion RPC.
 
 After `0001`, also apply `supabase/seed/0001_reference_data.sql`; it populates
 the pathways and titles required by the app. `0002_example_content.sql` is
@@ -48,6 +51,20 @@ when following the complete ordered sequence. `0009` and `0010` depend on the
 instructor authorization established by `0007`. `0011` depends on the help
 tables and RPCs from `0001`/`0002`, the instructor roles from `0007`, and the
 visibility policies from `0010`.
+`0012` depends on the activity-claim schema from `0003` and challenge
+visibility policies from `0010`. Apply it after `0011` in the migration
+sequence.
+`0013` depends on the base schema, activity claims, and instructor role
+authorization from `0001`, `0003`, and `0007`, plus the CRUD policies from
+`0009` and `0010`. It allows instructors to delete problems or topics
+with linked submissions (the submissions are cascaded), edit pending
+problem solutions/presentations, and edit/delete student-submitted
+opportunities. Editing reviewed work does not change its review decision or XP.
+Deleting work does not reverse XP already awarded; unapproved work has no XP
+award to reverse. Verify/apply it after `0012` before relying on these controls.
+`0014` depends on instructor role authorization from `0007` and the curated
+opportunity schema/policies from `0010`. Apply it after `0013` to enable the
+curated-opportunity delete control.
 
 Migration `0001` creates `pathway_xp` as a table maintained with the XP ledger.
 The earlier SQL also attempted to create a view with the same name; that
@@ -60,9 +77,10 @@ roles on Auth email updates, backfills existing profiles, and preserves the RLS
 guard against self-elevation. **The database role behavior is not updated until
 this SQL has been run successfully.**
 
-Migration `0009` rejects deleting problems with submissions. Migration `0010`
-rejects deleting topics with submissions. Archive or close those records
-instead. Migration `0010` also enables
+Migrations `0009` and `0010` initially guard deletion of problems and topics
+with submissions. Migration `0013` supersedes those guards to allow instructor
+deletion and relies on the schema's cascading submission foreign keys; XP
+history remains in the ledger. Migration `0010` also enables
 topic drafts and archiving, guards topic deletion when submissions exist,
 restricts student proposals to unpublished drafts, hides pending opportunity
 submissions from other developers, adds instructor-managed curated opportunity

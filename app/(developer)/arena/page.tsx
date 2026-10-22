@@ -147,10 +147,10 @@ export default async function ArenaPage({
           <EmptyState
             icon={ListChecks}
             eyebrow="Arena"
-            title={challenges.length === 0 ? "No problems posted yet" : "Nothing matches that filter"}
+            title={challenges.length === 0 ? "No open problems available" : "Nothing matches that filter"}
             body={
               challenges.length === 0
-                ? "The instructor has not posted any open problems. Check back after the next session."
+                ? "There are no open problems available right now. New problems appear here when the instructor posts them."
                 : "Clear the search or pick a different pathway to see the rest of the board."
             }
           />

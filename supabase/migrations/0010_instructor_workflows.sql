@@ -18,6 +18,7 @@ update public.teaching_proposals t
    and t.reviewed_by is null;
 
 drop policy if exists "reference data is public" on public.challenges;
+drop policy if exists "published challenges are readable" on public.challenges;
 create policy "published challenges are readable"
   on public.challenges for select
   using (status <> 'draft' or public.is_instructor(auth.uid()));
@@ -173,6 +174,7 @@ create policy "submit own claimed published work"
     )
   );
 
+drop policy if exists "instructors delete topics" on public.teaching_proposals;
 create policy "instructors delete topics"
   on public.teaching_proposals for delete
   using (public.is_instructor(auth.uid()));
@@ -215,6 +217,8 @@ revoke update on public.opportunities from public, anon, authenticated;
 
 alter table public.opportunities
   add column if not exists listing_state text not null default 'published';
+alter table public.opportunities
+  drop constraint if exists opportunities_listing_state_check;
 alter table public.opportunities
   add constraint opportunities_listing_state_check
   check (listing_state in ('draft', 'published', 'archived'));

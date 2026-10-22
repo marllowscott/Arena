@@ -199,8 +199,8 @@ export default async function DeveloperDashboardPage() {
                 <EmptyState
                   icon={Target}
                   eyebrow="Arena"
-                  title="No problems posted yet"
-                  body="The instructor posts problems here. Check back soon, or ask in your session."
+                  title="No open problems available"
+                  body="There are no open problems available right now. Check back when the instructor posts more."
                 />
               </div>
             ) : (

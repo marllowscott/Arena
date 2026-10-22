@@ -6,7 +6,11 @@ import { Check, RotateCcw, Sliders } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { reviewSubmission } from "@/lib/arena/actions";
+import {
+  deleteInstructorSubmission,
+  reviewSubmission,
+  updateInstructorSubmission,
+} from "@/lib/arena/actions";
 import { formatXp } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { SubmissionRow } from "@/lib/arena/data";
@@ -198,6 +202,158 @@ export function SubmissionPanel({ submission }: { submission: SubmissionRow }) {
             {submission.how_fixed}
           </p>
         </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function SubmissionManagementControls({
+  submission,
+}: {
+  submission: SubmissionRow;
+}) {
+  const router = useRouter();
+  const [editing, setEditing] = React.useState(false);
+  const [pending, setPending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [info, setInfo] = React.useState<string | null>(null);
+
+  async function save(formData: FormData) {
+    setPending(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const result = await updateInstructorSubmission(submission.id, formData);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setEditing(false);
+      setInfo(result.info ?? "Submission updated.");
+      router.refresh();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not update this submission. Please try again.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function remove() {
+    if (
+      !window.confirm(
+        `Delete this ${submission.awarded_xp ? "reviewed" : "unapproved"} submission? Any XP already awarded remains in the XP history.`,
+      )
+    ) {
+      return;
+    }
+    setPending(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const result = await deleteInstructorSubmission(submission.id);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not delete this submission. Please try again.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 border-t border-sand-300 pt-3">
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={pending}
+          onClick={() => setEditing((current) => !current)}
+        >
+          {editing ? "Close editor" : "Edit submission"}
+        </Button>
+        <Button type="button" size="sm" variant="danger" disabled={pending} onClick={remove}>
+          {pending ? "Working…" : "Delete submission"}
+        </Button>
+      </div>
+
+      {error ? <FieldError className="mt-2">{error}</FieldError> : null}
+      {info ? (
+        <p role="status" className="mt-2 text-sm text-support-deep">
+          {info}
+        </p>
+      ) : null}
+
+      {editing ? (
+        <form action={save} className="mt-4 space-y-3">
+          {submission.status !== "pending" ? (
+            <p className="text-xs text-ink-400">
+              Editing reviewed work does not change its review decision or XP award.
+            </p>
+          ) : null}
+          <div className="space-y-1.5">
+            <Label htmlFor={`submission-solution-${submission.id}`}>Solution / presentation</Label>
+            <Textarea
+              id={`submission-solution-${submission.id}`}
+              name="solution"
+              required
+              maxLength={20000}
+              defaultValue={submission.solution}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`submission-evidence-${submission.id}`}>Evidence (one per line)</Label>
+            <Textarea
+              id={`submission-evidence-${submission.id}`}
+              name="evidence"
+              defaultValue={submission.evidence.join("\n")}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`submission-explanation-${submission.id}`}>Explanation</Label>
+            <Textarea
+              id={`submission-explanation-${submission.id}`}
+              name="explainIt"
+              required
+              maxLength={10000}
+              defaultValue={submission.explain_it}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor={`submission-broke-${submission.id}`}>What broke</Label>
+              <Textarea
+                id={`submission-broke-${submission.id}`}
+                name="whatBroke"
+                maxLength={10000}
+                defaultValue={submission.what_broke}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`submission-fixed-${submission.id}`}>How it was fixed</Label>
+              <Textarea
+                id={`submission-fixed-${submission.id}`}
+                name="howFixed"
+                maxLength={10000}
+                defaultValue={submission.how_fixed}
+              />
+            </div>
+          </div>
+          <Button type="submit" size="sm" disabled={pending}>
+            {pending ? "Saving…" : "Save submission"}
+          </Button>
+        </form>
       ) : null}
     </div>
   );

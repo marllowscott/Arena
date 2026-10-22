@@ -59,7 +59,7 @@ export function TopicProposalManager({
   async function remove() {
     if (
       !window.confirm(
-        `Delete "${topic.title}"? Topics with submissions cannot be deleted; archive them instead.`,
+        `Delete "${topic.title}" and its student presentations? Any XP already awarded remains in the XP history.`,
       )
     ) {
       return;

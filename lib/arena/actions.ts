@@ -289,31 +289,12 @@ export async function claim(
     return { error: "Instructor accounts cannot claim developer activities." };
   }
 
-  const table = kind === "challenge" ? "challenges" : "teaching_proposals";
-  const { data: activity, error: activityError } = await supabase
-    .from(table)
-    .select("status")
-    .eq("id", activityId)
-    .maybeSingle();
-  const claimableStatuses =
-    kind === "challenge" ? ["open"] : ["open", "scheduled", "delivered"];
-  if (activityError) return { error: `Could not check activity status: ${activityError.message}` };
-  if (!activity || !claimableStatuses.includes(activity.status)) {
-    return { error: "This activity is not currently available to claim." };
-  }
-
-  const { error } = await supabase.from("activity_claims").insert({
-    kind,
-    activity_id: activityId,
-    developer_id: session.userId,
+  const { data: claimed, error } = await supabase.rpc("claim_activity", {
+    p_kind: kind,
+    p_activity_id: activityId,
   });
-
-  if (error) {
-    if (String(error.code) === "23505") {
-      return { info: "You already have this one." };
-    }
-    return { error: "Could not record the claim." };
-  }
+  if (error) return { error: error.message };
+  if (!claimed) return { info: "This activity has already been claimed." };
   return { ok: true };
 }
 
@@ -1019,7 +1000,7 @@ export async function deleteTopic(topicId: string): Promise<ActionResult> {
   if (!data) {
     return {
       error:
-        "Topic was not deleted. It may already be gone, have submissions, or require migration 0010_instructor_workflows.sql for instructor delete permission.",
+        "Topic was not deleted. It may already be gone or require migration 0010_instructor_workflows.sql for instructor delete permission.",
     };
   }
 
@@ -1120,6 +1101,77 @@ export async function reviewSubmission(
   };
 }
 
+export async function updateInstructorSubmission(
+  submissionId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  await requireInstructor();
+  if (!submissionId.trim()) return { error: "Unknown submission." };
+
+  const solution = String(formData.get("solution") ?? "").trim();
+  const evidence = String(formData.get("evidence") ?? "")
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const explainIt = String(formData.get("explainIt") ?? "").trim();
+  const whatBroke = String(formData.get("whatBroke") ?? "").trim();
+  const howFixed = String(formData.get("howFixed") ?? "").trim();
+
+  if (!solution || solution.length > 20000) {
+    return { error: "Solution is required and must be 20,000 characters or fewer." };
+  }
+  if (!explainIt || explainIt.length > 10000) {
+    return { error: "Explanation is required and must be 10,000 characters or fewer." };
+  }
+  if (evidence.length > 20 || evidence.some((item) => item.length > 2000)) {
+    return { error: "Use at most 20 evidence links or notes, each 2,000 characters or fewer." };
+  }
+  if (whatBroke.length > 10000 || howFixed.length > 10000) {
+    return { error: "Each troubleshooting field must be 10,000 characters or fewer." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("instructor_update_submission", {
+    p_submission_id: submissionId,
+    p_solution: solution,
+    p_evidence: evidence,
+    p_explain_it: explainIt,
+    p_what_broke: whatBroke,
+    p_how_fixed: howFixed,
+  });
+  if (error) return { error: explainDbError(error, "Updating a submission") };
+
+  revalidatePath("/instructor/review-queue");
+  revalidatePath("/");
+  revalidatePath("/arena");
+  revalidatePath("/teach");
+  return { ok: true, info: "Submission updated." };
+}
+
+export async function deleteInstructorSubmission(
+  submissionId: string,
+): Promise<ActionResult> {
+  await requireInstructor();
+  if (!submissionId.trim()) return { error: "Unknown submission." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("instructor_delete_submission", {
+    p_submission_id: submissionId,
+  });
+  if (error) return { error: explainDbError(error, "Deleting a submission") };
+
+  revalidatePath("/instructor/review-queue");
+  revalidatePath("/instructor");
+  revalidatePath("/");
+  revalidatePath("/arena");
+  revalidatePath("/teach");
+  revalidatePath("/leaderboard");
+  return {
+    ok: true,
+    info: "Submission deleted. Any XP already awarded remains in the XP history.",
+  };
+}
+
 export async function reviewOpportunity(
   opportunityId: string,
   decision: "approve" | "reject",
@@ -1162,6 +1214,91 @@ export async function reviewOpportunity(
       decision === "approve"
         ? `Verified.${xp > 0 ? ` ${xp} XP awarded.` : ""}`
         : "Rejected. No XP awarded.",
+  };
+}
+
+export async function updateStudentOpportunity(
+  opportunityId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  await requireInstructor();
+  if (!opportunityId.trim()) return { error: "Unknown opportunity." };
+
+  const organisation = String(formData.get("organisation") ?? "").trim();
+  const role = String(formData.get("role") ?? "").trim();
+  const summary = String(formData.get("summary") ?? "").trim();
+  const type = String(formData.get("type") ?? "").trim();
+  const location = String(formData.get("location") ?? "").trim();
+  const applyUrl = String(formData.get("applyUrl") ?? "").trim();
+  const closesAtInput = String(formData.get("closesAt") ?? "").trim();
+  const closesAt = closesAtInput ? new Date(closesAtInput) : null;
+
+  if (!organisation || organisation.length > 160) {
+    return { error: "Organisation is required and must be 160 characters or fewer." };
+  }
+  if (!role || role.length > 200) {
+    return { error: "Role or title is required and must be 200 characters or fewer." };
+  }
+  if (summary.length > 5000) {
+    return { error: "Description must be 5,000 characters or fewer." };
+  }
+  if (!type || type.length > 80) {
+    return { error: "Opportunity type is required and must be 80 characters or fewer." };
+  }
+  if (location.length > 160 || applyUrl.length > 2000) {
+    return { error: "Location or application link exceeds its allowed length." };
+  }
+  if (applyUrl) {
+    try {
+      const parsedUrl = new URL(applyUrl);
+      if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+        return { error: "Apply link must use http or https." };
+      }
+    } catch {
+      return { error: "Enter a valid apply link." };
+    }
+  }
+  if (closesAtInput && (!closesAt || Number.isNaN(closesAt.getTime()))) {
+    return { error: "Enter a valid closing date and time." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("instructor_update_student_opportunity", {
+    p_opportunity_id: opportunityId,
+    p_organisation: organisation,
+    p_role: role,
+    p_summary: summary,
+    p_type: type,
+    p_location: location,
+    p_apply_url: applyUrl,
+    p_closes_at: closesAt?.toISOString() ?? null,
+  });
+  if (error) return { error: explainDbError(error, "Updating a student opportunity") };
+
+  revalidatePath("/instructor/opportunities");
+  revalidatePath("/opportunities");
+  return { ok: true, info: "Student-submitted opportunity updated." };
+}
+
+export async function deleteStudentOpportunity(
+  opportunityId: string,
+): Promise<ActionResult> {
+  await requireInstructor();
+  if (!opportunityId.trim()) return { error: "Unknown opportunity." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("instructor_delete_student_opportunity", {
+    p_opportunity_id: opportunityId,
+  });
+  if (error) return { error: explainDbError(error, "Deleting a student opportunity") };
+
+  revalidatePath("/instructor/opportunities");
+  revalidatePath("/opportunities");
+  revalidatePath("/");
+  revalidatePath("/leaderboard");
+  return {
+    ok: true,
+    info: "Student-submitted opportunity deleted. Any XP already awarded remains in the XP history.",
   };
 }
 
@@ -1265,18 +1402,18 @@ export async function deleteCuratedOpportunity(
   if (!opportunityId.trim()) return { error: "Unknown opportunity." };
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("opportunities")
-    .delete()
-    .eq("id", opportunityId)
-    .is("submitted_by", null)
-    .select("id")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc(
+    "instructor_delete_curated_opportunity",
+    { p_opportunity_id: opportunityId },
+  );
   if (error) {
-    return { error: `Could not delete curated opportunity: ${error.message}` };
+    return { error: explainDbError(error, "Deleting a curated opportunity") };
   }
   if (!data) {
-    return { error: "Curated opportunity not found or no longer available to delete." };
+    return {
+      error:
+        "Curated opportunity was not deleted. Confirm it still exists and that migration 0014 has been applied.",
+    };
   }
 
   revalidatePath("/instructor/opportunities");

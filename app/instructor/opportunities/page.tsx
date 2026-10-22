@@ -3,11 +3,8 @@ import { Compass } from "lucide-react";
 import { PageHeader } from "@/components/shared/section-heading";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
-import { OpportunityStatusBadge } from "@/components/arena/status-badge";
 import { OpportunityVerification } from "@/components/instructor/opportunity-verification";
 import { CuratedOpportunityManager } from "@/components/instructor/curated-opportunity-manager";
-import { formatXp, relativeTime } from "@/lib/format";
-import { nowMs } from "@/lib/arena/clock";
 import {
   curatedOpportunities,
   listOpportunities,
@@ -85,26 +82,11 @@ export default async function InstructorOpportunitiesPage() {
         ) : (
           <ul className="mt-4 space-y-2">
             {decided.map((opportunity) => (
-              <li
+              <OpportunityVerification
                 key={opportunity.id}
-                className="flex flex-wrap items-center gap-3 rounded-md border border-sand-300 bg-sand-50 px-4 py-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-ink-800">
-                    {opportunity.role}
-                  </div>
-                  <div className="truncate font-mono text-[10px] uppercase tracking-[0.1em] text-ink-300">
-                    {opportunity.organisation} · {opportunity.submitter_name ?? "developer"} ·{" "}
-                    {relativeTime(opportunity.created_at, nowMs())}
-                  </div>
-                </div>
-                <OpportunityStatusBadge reviewStatus={opportunity.review_status} />
-                {opportunity.review_status === "approved" && opportunity.xp_reward > 0 ? (
-                  <span className="font-mono text-xs font-semibold tabular-nums text-primary">
-                    +{formatXp(opportunity.xp_reward)} XP
-                  </span>
-                ) : null}
-              </li>
+                opportunity={opportunity}
+                allowReview={false}
+              />
             ))}
           </ul>
         )}

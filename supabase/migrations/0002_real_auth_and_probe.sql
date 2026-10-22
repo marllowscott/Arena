@@ -17,7 +17,7 @@
 -- (0001 line 437) counted a reviews-scope developer_unlock, which meant the
 -- instructor was whoever happened to be holding an unlock.
 alter table public.profiles
-  add column role text not null default 'developer'
+  add column if not exists role text not null default 'developer'
     check (role in ('developer', 'instructor'));
 
 -- Carry the old definition forward so nobody loses instructor access on deploy.
@@ -102,14 +102,14 @@ create trigger on_auth_user_created
 -- 0001's help_requests was behind the TypeScript type: tags, technologies,
 -- urgency and flagging existed in the app but had nowhere to live.
 alter table public.help_requests
-  add column accepted_by uuid references public.profiles (id) on delete set null,
-  add column accepted_at timestamptz,
-  add column tags text[] not null default '{}',
-  add column technologies text[] not null default '{}',
-  add column urgency text not null default 'normal'
+  add column if not exists accepted_by uuid references public.profiles (id) on delete set null,
+  add column if not exists accepted_at timestamptz,
+  add column if not exists tags text[] not null default '{}',
+  add column if not exists technologies text[] not null default '{}',
+  add column if not exists urgency text not null default 'normal'
     check (urgency in ('normal', 'blocking')),
-  add column flagged boolean not null default false,
-  add column flag_reason text;
+  add column if not exists flagged boolean not null default false,
+  add column if not exists flag_reason text;
 
 -- Accepting is a compare-and-set: the `accepted_by is null` predicate is what
 -- makes it exclusive. Two developers tapping the button at the same moment
@@ -265,15 +265,18 @@ grant execute on function public.confirm_probe_answer(uuid, uuid) to authenticat
 
 -- 0001 opened challenges read-only. This is the policy that makes the
 -- instructor side real: authoring, editing and retiring problems.
+drop policy if exists "instructors create challenges" on public.challenges;
 create policy "instructors create challenges"
   on public.challenges for insert
   with check (is_instructor(auth.uid()));
 
+drop policy if exists "instructors update challenges" on public.challenges;
 create policy "instructors update challenges"
   on public.challenges for update
   using (is_instructor(auth.uid()))
   with check (is_instructor(auth.uid()));
 
+drop policy if exists "instructors delete challenges" on public.challenges;
 create policy "instructors delete challenges"
   on public.challenges for delete
   using (is_instructor(auth.uid()));
@@ -281,11 +284,13 @@ create policy "instructors delete challenges"
 -- A developer may edit their own probe but may not claim it, and RLS has no way
 -- to compare against the old row, so accepted_by is protected by the RPCs and
 -- this policy simply refuses to let a claim be written directly.
+drop policy if exists "asker edits own probe" on public.help_requests;
 create policy "asker edits own probe"
   on public.help_requests for update
   using (auth.uid() = developer_id)
   with check (auth.uid() = developer_id and accepted_by is null);
 
+drop policy if exists "instructors moderate probes" on public.help_requests;
 create policy "instructors moderate probes"
   on public.help_requests for update
   using (is_instructor(auth.uid()))
@@ -293,11 +298,13 @@ create policy "instructors moderate probes"
 
 -- Nobody creates their own profile. The signup trigger writes it as definer,
 -- and this closes the alternative of a forged row with a chosen role.
+drop policy if exists "own profile only" on public.profiles;
 create policy "own profile only"
   on public.profiles for insert
   with check (auth.uid() = id and role = 'developer');
 
 -- Nobody promotes themselves. Role changes are an operator action.
+drop policy if exists "no self promotion" on public.profiles;
 create policy "no self promotion"
   on public.profiles for update
   using (auth.uid() = id)

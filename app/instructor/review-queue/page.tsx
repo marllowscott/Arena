@@ -5,7 +5,11 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { SubmissionStatusBadge } from "@/components/arena/status-badge";
-import { ReviewControls, SubmissionPanel } from "@/components/instructor/review-controls";
+import {
+  ReviewControls,
+  SubmissionManagementControls,
+  SubmissionPanel,
+} from "@/components/instructor/review-controls";
 import { FilterLinks } from "@/components/shared/filter-links";
 import { SearchField } from "@/components/shared/search-field";
 import { formatXp, relativeTime } from "@/lib/format";
@@ -145,6 +149,7 @@ export default async function ReviewQueuePage({
               <SubmissionPanel submission={submission} />
 
               <ReviewControls submission={submission} />
+              <SubmissionManagementControls submission={submission} />
             </li>
           ))}
         </ul>
@@ -195,6 +200,7 @@ export default async function ReviewQueuePage({
                     {submission.reviewer_note}
                   </p>
                 ) : null}
+                <SubmissionManagementControls submission={submission} />
               </li>
             ))}
           </ul>

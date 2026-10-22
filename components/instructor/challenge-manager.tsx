@@ -21,7 +21,11 @@ export function ChallengeManager({
   const [error, setError] = React.useState<string | null>(null);
 
   async function remove() {
-    if (!window.confirm(`Delete "${challenge.title}"? Problems with submissions cannot be deleted.`)) {
+    if (
+      !window.confirm(
+        `Delete "${challenge.title}" and its student submissions? Any XP already awarded remains in the XP history.`,
+      )
+    ) {
       return;
     }
     setPending(true);
