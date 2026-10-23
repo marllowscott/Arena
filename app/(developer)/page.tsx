@@ -37,6 +37,7 @@ import {
 import { listTitles, pathwayXpFor, titlesFor } from "@/lib/arena/progression";
 import { readHubAnnouncements } from "@/lib/arena/hub";
 import { requireDeveloper } from "@/lib/arena/session";
+import { createClient } from "@/lib/supabase/server";
 import type { ChallengeRow, SubmissionRow } from "@/lib/arena/data";
 import type { Pathway } from "@/lib/types";
 
@@ -48,6 +49,20 @@ export const metadata: Metadata = {
 export default async function DeveloperDashboardPage() {
   const session = await requireDeveloper();
   const profile = session.profile!;
+  const isFirstDashboardVisit =
+    Date.parse(profile.created_at) === Date.parse(profile.last_active_at);
+
+  if (isFirstDashboardVisit) {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ last_active_at: new Date().toISOString() })
+      .eq("id", profile.id);
+
+    if (error) {
+      throw new Error(`Could not record the dashboard visit: ${error.message}`);
+    }
+  }
 
   const [
     openChallenges,
@@ -122,7 +137,11 @@ export default async function DeveloperDashboardPage() {
     <div className="px-4 py-8 sm:px-6">
       <PageHeader
         eyebrow="Developer dashboard"
-        title={`Welcome back, ${profile.full_name.split(" ")[0]}`}
+        title={
+          isFirstDashboardVisit
+            ? "Welcome"
+            : `Welcome back, ${profile.full_name.split(" ")[0]}`
+        }
         description="Claim a problem, submit evidence, and the instructor awards XP on approval."
       />
 

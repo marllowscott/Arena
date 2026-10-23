@@ -555,17 +555,6 @@ export async function pendingOpportunities(): Promise<OpportunityRow[]> {
   return ((data ?? []) as Array<Record<string, unknown>>).map(mapOpportunity);
 }
 
-export async function curatedOpportunities(): Promise<OpportunityRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("opportunities")
-    .select(await opportunitySelectTyped())
-    .is("submitted_by", null)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return ((data ?? []) as Array<Record<string, unknown>>).map(mapOpportunity);
-}
-
 /* -------------------------------------------------------------------------- */
 /* Persistent Probe/help                                                      */
 /* -------------------------------------------------------------------------- */
@@ -842,6 +831,7 @@ export async function leaderboard(): Promise<ProfileRow[]> {
       "id, handle, full_name, headline, primary_pathway, total_xp, weekly_xp, streak_days, avatar_from, avatar_to, role, created_at, last_active_at",
     )
     .eq('role', 'developer')
+    .gt('total_xp', 0)
     .order("total_xp", { ascending: false })
     .order("weekly_xp", { ascending: false })
     .limit(100);

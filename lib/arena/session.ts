@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, hasAdminCredentials } from "@/lib/supabase/admin";
 
 export interface ArenaProfile {
   id: string;
@@ -60,13 +61,46 @@ export async function requireSession(): Promise<ArenaSession> {
 /** Check the database-assigned role used by RLS and instructor operations. */
 export async function isInstructor(userId: string): Promise<boolean> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("is_instructor", {
-    p_user_id: userId,
-  });
-  if (error) {
-    throw new Error(`Could not verify instructor access: ${error.message}`);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const email = (user?.email ?? "").trim().toLowerCase();
+  const instructorDomain = email.endsWith("@uncommon.org");
+
+  if (instructorDomain && hasAdminCredentials()) {
+    try {
+      const admin = createAdminClient();
+      await admin.from("profiles").update({ role: "instructor" }).eq("id", userId);
+    } catch {
+      // Best-effort repair; fall back to the domain check below.
+    }
   }
-  return data === true;
+
+  if (hasAdminCredentials()) {
+    try {
+      const admin = createAdminClient();
+      const { data } = await admin
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle();
+      if (data?.role === "instructor") return true;
+      if (instructorDomain) return true;
+    } catch {
+      // Fall through to the database RPC.
+    }
+  }
+
+  try {
+    const { data, error } = await supabase.rpc("is_instructor", {
+      p_user_id: userId,
+    });
+    if (error) return instructorDomain;
+    if (data === true) return true;
+  } catch {
+    return instructorDomain;
+  }
+  return instructorDomain;
 }
 
 /** Instructor area gate. Developers are sent back to the developer area. */

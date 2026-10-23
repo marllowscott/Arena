@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     "Developer progression for Mufakose Innovation Hub. Build, solve, explain, help, compete, level up.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"

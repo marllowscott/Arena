@@ -9,7 +9,8 @@ import {
 import Link from "next/link";
 import { PageHeader } from "@/components/shared/section-heading";
 import { StatCard } from "@/components/shared/stat-card";
-import { flaggedProbeCount, hubActivity, leaderboard, pendingOpportunities, pendingSubmissions } from "@/lib/arena/data";
+import { flaggedProbeCount, hubActivity, pendingOpportunities, pendingSubmissions } from "@/lib/arena/data";
+import { listManagedDevelopers } from "@/lib/arena/developer-management";
 import { requireInstructor } from "@/lib/arena/session";
 import { formatXp, relativeTime } from "@/lib/format";
 import { nowMs } from "@/lib/arena/clock";
@@ -20,7 +21,7 @@ export default async function InstructorDashboardPage() {
   const [submissions, opportunities, roster, activity, flaggedProbes] = await Promise.all([
     pendingSubmissions(),
     pendingOpportunities(),
-    leaderboard(),
+    listManagedDevelopers(),
     hubActivity(10),
     flaggedProbeCount(),
   ]);

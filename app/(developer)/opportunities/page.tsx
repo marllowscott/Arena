@@ -32,8 +32,8 @@ export default async function OpportunitiesPage({
      their verification state so you can see what the instructor did. */
   const board = opportunities.filter(
     (opportunity) =>
-      opportunity.review_status === "approved" ||
-      opportunity.submitted_by === null,
+      opportunity.review_status === "approved" &&
+      opportunity.submitted_by !== null,
   );
   const mine = opportunities.filter(
     (opportunity) => opportunity.submitted_by === profile.id,
