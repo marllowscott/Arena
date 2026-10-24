@@ -53,6 +53,7 @@ export function ProblemForm({
 
   return (
     <form key={problem?.id ?? "new-problem"} action={handle} className="space-y-3">
+      <input type="hidden" name="pathwayId" value={problem?.pathway_id ?? "problem-solver"} />
       <div className="space-y-1.5">
         <Label htmlFor="title">Title</Label>
         <Input
@@ -78,27 +79,15 @@ export function ProblemForm({
           placeholder="Find the cause, fix it, and show evidence that the request now succeeds."
         />
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="pathwayId">Pathway</Label>
-          <Select id="pathwayId" name="pathwayId" defaultValue={problem?.pathway_id ?? "problem-solver"}>
-            {pathwayOptions.map((pathway) => (
-              <option key={pathway.id} value={pathway.id}>
-                {pathway.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="difficulty">Difficulty</Label>
-          <Select id="difficulty" name="difficulty" defaultValue={problem?.difficulty ?? "starter"}>
-            {DIFFICULTIES.map((difficulty) => (
-              <option key={difficulty} value={difficulty}>
-                {difficulty}
-              </option>
-            ))}
-          </Select>
-        </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="difficulty">Difficulty</Label>
+        <Select id="difficulty" name="difficulty" defaultValue={problem?.difficulty ?? "starter"}>
+          {DIFFICULTIES.map((difficulty) => (
+            <option key={difficulty} value={difficulty}>
+              {difficulty}
+            </option>
+          ))}
+        </Select>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
@@ -109,7 +98,11 @@ export function ProblemForm({
         <div className="space-y-1.5">
           <Label htmlFor="status">Status</Label>
           <Select id="status" name="status" defaultValue={problem?.status ?? "open"}>
-            {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+            {STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
           </Select>
         </div>
       </div>
