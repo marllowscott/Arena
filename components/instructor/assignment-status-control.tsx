@@ -4,19 +4,19 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { FieldError, Select } from "@/components/ui/input";
-import { setProblemStatus } from "@/lib/arena/actions";
+import { setAssignmentStatus } from "@/lib/arena/actions";
 
 const STATUSES = ["open", "locked", "closed", "draft"];
 
 /**
- * Inline visibility control for one problem. The instructor policy on
+ * Inline visibility control for one assignment. The instructor policy on
  * `challenges` is the boundary — this only chooses which status to write.
  */
-export function ProblemStatusControl({
-  problemId,
+export function AssignmentStatusControl({
+  assignmentId,
   status,
 }: {
-  problemId: string;
+  assignmentId: string;
   status: string;
 }) {
   const router = useRouter();
@@ -37,13 +37,13 @@ export function ProblemStatusControl({
     setError(null);
     setInfo(null);
     try {
-      const result = await setProblemStatus(problemId, next);
+      const result = await setAssignmentStatus(assignmentId, next);
       if (result.error) {
         setError(result.error);
         setNext(status);
         return;
       }
-      setInfo(result.info ?? "Problem updated.");
+      setInfo(result.info ?? "Assignment updated.");
       router.refresh();
     } finally {
       setPending(false);

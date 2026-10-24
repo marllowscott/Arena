@@ -11,7 +11,7 @@ import type { HelpRequestDetail } from "@/lib/services/contracts";
 /* Row shapes â€” the live database columns, mapped to the app's needs.          */
 /* -------------------------------------------------------------------------- */
 
-export interface ChallengeRow {
+export interface AssignmentRow {
   id: string;
   slug: string;
   title: string;
@@ -204,7 +204,7 @@ export async function profileFor(userId: string): Promise<ProfileRow | null> {
 /* Challenges (Problems)                                                       */
 /* -------------------------------------------------------------------------- */
 
-export async function listOpenChallenges(): Promise<ChallengeRow[]> {
+export async function listOpenChallenges(): Promise<AssignmentRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("challenges")
@@ -212,20 +212,20 @@ export async function listOpenChallenges(): Promise<ChallengeRow[]> {
     .eq("status", "open")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as ChallengeRow[];
+  return (data ?? []) as AssignmentRow[];
 }
 
-export async function listAllChallenges(): Promise<ChallengeRow[]> {
+export async function listAllAssignments(): Promise<AssignmentRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("challenges")
     .select("*")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as ChallengeRow[];
+  return (data ?? []) as AssignmentRow[];
 }
 
-export async function getChallenge(id: string): Promise<ChallengeRow | null> {
+export async function getChallenge(id: string): Promise<AssignmentRow | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("challenges")
@@ -233,14 +233,14 @@ export async function getChallenge(id: string): Promise<ChallengeRow | null> {
     .eq("id", id)
     .maybeSingle();
   if (error) return null;
-  return (data ?? null) as ChallengeRow | null;
+  return (data ?? null) as AssignmentRow | null;
 }
 
 /**
  * The Arena links to problems by slug, so the detail route receives a slug
  * rather than the row id.
  */
-export async function getChallengeBySlug(slug: string): Promise<ChallengeRow | null> {
+export async function getChallengeBySlug(slug: string): Promise<AssignmentRow | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("challenges")
@@ -248,11 +248,11 @@ export async function getChallengeBySlug(slug: string): Promise<ChallengeRow | n
     .eq("slug", slug)
     .maybeSingle();
   if (error) return null;
-  return (data ?? null) as ChallengeRow | null;
+  return (data ?? null) as AssignmentRow | null;
 }
 
 /** Accepts either the row id or the URL slug. */
-export async function findChallenge(idOrSlug: string): Promise<ChallengeRow | null> {
+export async function findChallenge(idOrSlug: string): Promise<AssignmentRow | null> {
   const byId = await getChallenge(idOrSlug);
   if (byId) return byId;
   return getChallengeBySlug(idOrSlug);

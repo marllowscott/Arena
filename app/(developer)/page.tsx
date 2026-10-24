@@ -38,7 +38,7 @@ import { listTitles, pathwayXpFor, titlesFor } from "@/lib/arena/progression";
 import { readHubAnnouncements } from "@/lib/arena/hub";
 import { requireDeveloper } from "@/lib/arena/session";
 import { createClient } from "@/lib/supabase/server";
-import type { ChallengeRow, SubmissionRow } from "@/lib/arena/data";
+import type { AssignmentRow, SubmissionRow } from "@/lib/arena/data";
 import type { Pathway } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -224,7 +224,7 @@ export default async function DeveloperDashboardPage() {
               </div>
             ) : (
               <ul className="mt-4 space-y-3">
-                {openChallenges.slice(0, 3).map((challenge: ChallengeRow) => {
+                {openChallenges.slice(0, 3).map((challenge: AssignmentRow) => {
                   const claimed = claimIds.includes(challenge.id);
                   const mine = claimedChallenges.includes(challenge.id);
                   return (

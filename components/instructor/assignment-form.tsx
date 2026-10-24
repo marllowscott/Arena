@@ -11,20 +11,20 @@ import {
   Select,
   Textarea,
 } from "@/components/ui/input";
-import { createProblem, updateProblem } from "@/lib/arena/actions";
-import type { ChallengeRow, PathwayRow } from "@/lib/arena/data";
+import { createAssignment, updateAssignment } from "@/lib/arena/actions";
+import type { AssignmentRow, PathwayRow } from "@/lib/arena/data";
 
 const DIFFICULTIES = ["starter", "builder", "advanced", "expert", "boss"];
 const STATUSES = ["open", "locked", "closed", "draft"];
 
 /** Instructor-side problem authoring form. */
-export function ProblemForm({
+export function AssignmentForm({
   pathwayOptions,
   problem,
   onCancel,
 }: {
   pathwayOptions: PathwayRow[];
-  problem?: ChallengeRow;
+  problem?: AssignmentRow;
   onCancel?: () => void;
 }) {
   const router = useRouter();
@@ -38,8 +38,8 @@ export function ProblemForm({
     setInfo(null);
     try {
       const result = problem
-        ? await updateProblem(problem.id, formData)
-        : await createProblem(formData);
+        ? await updateAssignment(problem.id, formData)
+        : await createAssignment(formData);
       if (result.error) setError(result.error);
       if (result.info) setInfo(result.info);
       if (result.ok) {

@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -126,7 +126,7 @@ export async function signup(formData: FormData): Promise<ActionResult> {
     if (message.includes("rate limit")) {
       return {
         error:
-          "Supabase is rate-limiting email sends. In the Supabase dashboard go to Authentication â†’ Settings, turn OFF 'Enable email confirmation', save, then try again.",
+          "Supabase is rate-limiting email sends. In the Supabase dashboard go to Authentication → Settings, turn OFF 'Enable email confirmation', save, then try again.",
       };
     }
     return { error: `Signup failed: ${String(error.message)}` };
@@ -134,7 +134,7 @@ export async function signup(formData: FormData): Promise<ActionResult> {
 
   if (!data.user || !data.session) {
     return {
-      info: "Check your email to confirm your account, then log in. If the email never arrives, turn off 'Enable email confirmation' in the Supabase dashboard (Authentication â†’ Settings).",
+      info: "Check your email to confirm your account, then log in. If the email never arrives, turn off 'Enable email confirmation' in the Supabase dashboard (Authentication → Settings).",
     };
   }
 
@@ -178,7 +178,7 @@ export async function inviteDeveloper(formData: FormData): Promise<ActionResult>
     return { error: "Enter a name no longer than 100 characters." };
   }
   if (handle && !/^[a-z0-9][a-z0-9_-]{1,29}$/.test(handle)) {
-    return { error: "Handle must be 2â€“30 characters using letters, numbers, _ or -." };
+    return { error: "Handle must be 2–30 characters using letters, numbers, _ or -." };
   }
 
   const admin = createAdminClient();
@@ -213,7 +213,7 @@ export async function updateDeveloper(
     return { error: "Enter a name no longer than 100 characters." };
   }
   if (!/^[a-z0-9][a-z0-9_-]{1,29}$/.test(handle)) {
-    return { error: "Handle must be 2â€“30 characters using letters, numbers, _ or -." };
+    return { error: "Handle must be 2–30 characters using letters, numbers, _ or -." };
   }
   if (headline.length > 160) {
     return { error: "Headline must be 160 characters or fewer." };
@@ -275,7 +275,7 @@ export async function deleteDeveloper(developerId: string): Promise<ActionResult
 }
 
 /* -------------------------------------------------------------------------- */
-/* Claims â€” "I am taking responsibility for this activity"                     */
+/* Claims — "I am taking responsibility for this activity"                     */
 /* -------------------------------------------------------------------------- */
 
 export async function claim(
@@ -320,7 +320,7 @@ export async function unclaim(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Problem submissions â€” XP is suggested by the problem row, never the form    */
+/* Problem submissions — XP is suggested by the problem row, never the form    */
 /* -------------------------------------------------------------------------- */
 
 export async function submitProblem(formData: FormData): Promise<ActionResult> {
@@ -382,11 +382,11 @@ export async function submitProblem(formData: FormData): Promise<ActionResult> {
   });
 
   if (error) return { error: "Could not submit. Please try again." };
-  return { ok: true, info: "Submitted. The instructor reviews it next â€” XP is awarded only on approval." };
+  return { ok: true, info: "Submitted. The instructor reviews it next — XP is awarded only on approval." };
 }
 
 /* -------------------------------------------------------------------------- */
-/* Topic presentations â€” same review artifact, paid in the teacher pathway     */
+/* Topic presentations — same review artifact, paid in the teacher pathway     */
 /* -------------------------------------------------------------------------- */
 
 export async function presentTopic(formData: FormData): Promise<ActionResult> {
@@ -799,7 +799,7 @@ function problemFromForm(formData: FormData) {
   } as const;
 }
 
-export async function createProblem(formData: FormData): Promise<ActionResult> {
+export async function createAssignment(formData: FormData): Promise<ActionResult> {
   await requireInstructor();
   const parsed = problemFromForm(formData);
   if ("error" in parsed) return parsed;
@@ -818,7 +818,7 @@ export async function createProblem(formData: FormData): Promise<ActionResult> {
   return { ok: true, info: "Problem published to the Arena." };
 }
 
-export async function updateProblem(id: string, formData: FormData): Promise<ActionResult> {
+export async function updateAssignment(id: string, formData: FormData): Promise<ActionResult> {
   await requireInstructor();
   if (!id.trim()) return { error: "Unknown problem." };
   const parsed = problemFromForm(formData);
@@ -831,13 +831,13 @@ export async function updateProblem(id: string, formData: FormData): Promise<Act
     return { error: `Could not update problem (${error.code}): ${error.message}` };
   }
 
-  revalidatePath("/instructor/challenges");
+  revalidatePath("/instructor/assignments");
   revalidatePath("/arena");
-  revalidatePath("/arena/[challengeId]", "page");
+  revalidatePath("/arena/[assignmentId]", "page");
   return { ok: true, info: "Problem updated." };
 }
 
-export async function deleteProblem(id: string): Promise<ActionResult> {
+export async function deleteAssignment(id: string): Promise<ActionResult> {
   await requireInstructor();
   if (!id.trim()) return { error: "Unknown problem." };
 
@@ -858,9 +858,9 @@ export async function deleteProblem(id: string): Promise<ActionResult> {
     };
   }
 
-  revalidatePath("/instructor/challenges");
+  revalidatePath("/instructor/assignments");
   revalidatePath("/arena");
-  revalidatePath("/arena/[challengeId]", "page");
+  revalidatePath("/arena/[assignmentId]", "page");
   return { ok: true, info: "Problem deleted." };
 }
 
@@ -1441,7 +1441,7 @@ export async function markNotificationsRead(): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** Used by the instructor "developers" view â€” one submission row shape. */
+/** Used by the instructor "developers" view — one submission row shape. */
 export type { SubmissionRow };
 
 /* -------------------------------------------------------------------------- */
@@ -1541,7 +1541,7 @@ export async function deleteProfileImage(): Promise<ActionResult> {
 /**
  * Interest in a topic proposal. `proposal_votes` already exists with the
  * "vote once" and "retract own vote" policies, so the write needs no schema
- * change â€” the client may only ever write its own row.
+ * change — the client may only ever write its own row.
  */
 export async function voteTopicProposal(proposalId: string): Promise<ActionResult> {
   const session = await requireSession();
@@ -1595,7 +1595,7 @@ type ProblemStatus = (typeof PROBLEM_STATUS_VALUES)[number];
  * instructor policy on `challenges` is the boundary; the browser cannot
  * change anything else about the row.
  */
-export async function setProblemStatus(
+export async function setAssignmentStatus(
   id: string,
   status: string,
 ): Promise<ActionResult> {
@@ -1611,9 +1611,9 @@ export async function setProblemStatus(
     return { error: explainDbError(error, "Changing the problem status") };
   }
 
-  revalidatePath("/instructor/challenges");
+  revalidatePath("/instructor/assignments");
   revalidatePath("/arena");
-  revalidatePath("/arena/[challengeId]", "page");
+  revalidatePath("/arena/[assignmentId]", "page");
   return { ok: true, info: `Problem is now ${status}.` };
 }
 
@@ -1665,7 +1665,7 @@ export async function setTopicStatus(
 
 /**
  * Grants a responsibility. `developer_unlocks` has no instructor write
- * policy, so this runs through the service-role client â€” the same privileged
+ * policy, so this runs through the service-role client — the same privileged
  * path the developer roster uses. The catalogue itself stays read-only.
  */
 export async function grantUnlock(

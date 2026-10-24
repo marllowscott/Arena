@@ -4,16 +4,16 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/input";
-import type { ChallengeRow, PathwayRow } from "@/lib/arena/data";
-import { deleteProblem } from "@/lib/arena/actions";
-import { ProblemForm } from "./problem-form";
+import type { AssignmentRow, PathwayRow } from "@/lib/arena/data";
+import { deleteAssignment } from "@/lib/arena/actions";
+import { AssignmentForm } from "./assignment-form";
 
-export function ChallengeManager({
+export function AssignmentManager({
   challenge,
   pathwayOptions,
   hasSubmissions = false,
 }: {
-  challenge: ChallengeRow;
+  challenge: AssignmentRow;
   pathwayOptions: PathwayRow[];
   hasSubmissions?: boolean;
 }) {
@@ -33,7 +33,7 @@ export function ChallengeManager({
     setPending(true);
     setError(null);
     try {
-      const result = await deleteProblem(challenge.id);
+      const result = await deleteAssignment(challenge.id);
       if (result.error) {
         setError(result.error);
         return;
@@ -63,7 +63,7 @@ export function ChallengeManager({
       {error ? <FieldError>{error}</FieldError> : null}
       {editing ? (
         <div className="mt-4 rounded-md border border-sand-300 bg-sand-100 p-4">
-          <ProblemForm
+            <AssignmentForm
             pathwayOptions={pathwayOptions}
             problem={challenge}
             onCancel={() => setEditing(false)}

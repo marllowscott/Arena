@@ -23,7 +23,7 @@ export interface NavItem {
 /** Developer experience: five destinations, one per activity. */
 export const developerNav: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, hint: "What to do next" },
-  { href: "/arena", label: "Problems", icon: ListChecks, hint: "Solve something" },
+  { href: "/arena", label: "Assignments", icon: ListChecks, hint: "Solve something" },
   { href: "/topics", label: "Topics", icon: Presentation, hint: "Research and present" },
   { href: "/opportunities", label: "Opportunities", icon: Compass, hint: "Find openings" },
   { href: "/dev-shop", label: "Dev Shop", icon: Store, hint: "Progress unlocks learning" },
@@ -34,7 +34,7 @@ export const developerNav: NavItem[] = [
 export const instructorNav: NavItem[] = [
   { href: "/instructor", label: "Dashboard", icon: LayoutDashboard, hint: "Needs attention" },
   { href: "/instructor/review-queue", label: "Review Queue", icon: ClipboardCheck, hint: "Submissions" },
-  { href: "/instructor/challenges", label: "Problems", icon: Target, hint: "Problem catalogue" },
+  { href: "/instructor/assignments", label: "Assignments", icon: Target, hint: "Assignment catalogue" },
   { href: "/instructor/topics", label: "Topics", icon: Presentation, hint: "Topics and presentations" },
   { href: "/instructor/opportunities", label: "Opportunities", icon: Compass, hint: "Verification" },
   { href: "/instructor/probes", label: "Problem reports", icon: LifeBuoy, hint: "What's lacking" },
