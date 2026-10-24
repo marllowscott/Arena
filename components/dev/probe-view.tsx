@@ -5,9 +5,8 @@ import { LifeBuoy } from "lucide-react";
 import { PageContainer, PageSection } from "@/components/shared/page-container";
 import { PageHeader } from "@/components/shared/section-heading";
 import { ProbeRequestForm } from "@/components/dev/probe-request-form";
-import type { PathwayRow } from "@/lib/arena/data";
 
-export function ProbeView({ pathways }: { pathways: PathwayRow[] }) {
+export function ProbeView() {
   return (
     <PageContainer size="wide">
       <PageHeader
@@ -16,7 +15,7 @@ export function ProbeView({ pathways }: { pathways: PathwayRow[] }) {
         description="Post what you are actually stuck on, including the error. The instructor reads it and turns the useful ones into assignments. No XP — just a heads-up."
       />
       <PageSection>
-        <ProbeRequestForm pathways={pathways} />
+        <ProbeRequestForm />
       </PageSection>
     </PageContainer>
   );
