@@ -27,7 +27,7 @@ export const developerNav: NavItem[] = [
   { href: "/topics", label: "Topics", icon: Presentation, hint: "Research and present" },
   { href: "/opportunities", label: "Opportunities", icon: Compass, hint: "Find openings" },
   { href: "/dev-shop", label: "Dev Shop", icon: Store, hint: "Progress unlocks learning" },
-  { href: "/leaderboard", label: "Leaderboard", icon: Trophy, hint: "Where you stand" },
+  { href: "/probe", label: "Problem reports", icon: LifeBuoy, hint: "What you are stuck on" },
 ];
 
 /** Instructor experience: the review authority. */
