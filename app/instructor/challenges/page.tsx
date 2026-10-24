@@ -12,7 +12,7 @@ import { FilterLinks } from "@/components/shared/filter-links";
 import { SearchField } from "@/components/shared/search-field";
 import { relativeTime } from "@/lib/format";
 import { nowMs } from "@/lib/arena/clock";
-import { claimsFor, listAllChallenges, listPathways } from "@/lib/arena/data";
+import { claimsFor, listAllChallenges, listPathways, submissionsForChallenge } from "@/lib/arena/data";
 import { requireInstructor } from "@/lib/arena/session";
 import type { ChallengeRow } from "@/lib/arena/data";
 
@@ -49,7 +49,17 @@ export default async function InstructorChallengesPage({
     );
   };
 
-  const visible = challenges.filter(matches);
+  const submissionCounts = new Map<string, number>();
+  await Promise.all(
+    challenges.map(async (challenge) => {
+      const submissions = await submissionsForChallenge(challenge.id);
+      submissionCounts.set(challenge.id, submissions.length);
+    }),
+  );
+
+  const visible = challenges
+    .filter(matches)
+    .filter((challenge) => (submissionCounts.get(challenge.id) ?? 0) === 0);
 
   const claimCounts = new Map<string, number>();
   await Promise.all(
@@ -130,9 +140,10 @@ export default async function InstructorChallengesPage({
               {visible.map((challenge) => (
                 <ChallengeRowCard
                   key={challenge.id}
-                  challenge={challenge}
-                  pathwayOptions={pathways}
-                  claimCount={claimCounts.get(challenge.id) ?? 0}
+                   challenge={challenge}
+                   pathwayOptions={pathways}
+                   claimCount={claimCounts.get(challenge.id) ?? 0}
+                   hasSubmissions={(submissionCounts.get(challenge.id) ?? 0) > 0}
                 />
               ))}
             </ul>
@@ -147,10 +158,12 @@ async function ChallengeRowCard({
   challenge,
   pathwayOptions,
   claimCount,
+  hasSubmissions = false,
 }: {
   challenge: ChallengeRow;
   pathwayOptions: Awaited<ReturnType<typeof listPathways>>;
   claimCount: number;
+  hasSubmissions?: boolean;
 }) {
   return (
     <li className="rounded-lg border border-sand-300 bg-sand-50 p-4 shadow-subtle">
@@ -178,7 +191,7 @@ async function ChallengeRowCard({
       <div className="mt-3">
         <ProblemStatusControl problemId={challenge.id} status={challenge.status} />
       </div>
-      <ChallengeManager challenge={challenge} pathwayOptions={pathwayOptions} />
+      <ChallengeManager challenge={challenge} pathwayOptions={pathwayOptions} hasSubmissions={hasSubmissions} />
     </li>
   );
 }

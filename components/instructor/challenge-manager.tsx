@@ -11,9 +11,11 @@ import { ProblemForm } from "./problem-form";
 export function ChallengeManager({
   challenge,
   pathwayOptions,
+  hasSubmissions = false,
 }: {
   challenge: ChallengeRow;
   pathwayOptions: PathwayRow[];
+  hasSubmissions?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = React.useState(false);
@@ -48,9 +50,15 @@ export function ChallengeManager({
         <Button type="button" size="sm" variant="secondary" onClick={() => setEditing(!editing)}>
           {editing ? "Close editor" : "Edit problem"}
         </Button>
-        <Button type="button" size="sm" variant="danger" disabled={pending} onClick={remove}>
-          {pending ? "Deleting…" : "Delete"}
-        </Button>
+        {hasSubmissions ? (
+          <span className="self-center font-mono text-[10px] uppercase tracking-[0.1em] text-ink-400">
+            Has submissions — close instead of deleting
+          </span>
+        ) : (
+          <Button type="button" size="sm" variant="danger" disabled={pending} onClick={remove}>
+            {pending ? "Deleting…" : "Delete"}
+          </Button>
+        )}
       </div>
       {error ? <FieldError>{error}</FieldError> : null}
       {editing ? (
