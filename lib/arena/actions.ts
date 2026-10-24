@@ -566,7 +566,7 @@ export async function createProbe(formData: FormData): Promise<ActionResult> {
   if (error) return { error: explainDbError(error, "Creating a Probe") };
 
   revalidatePath("/probe");
-  return { ok: true, info: `Probe posted. Open it at /probe/${data.id}.` };
+  return { ok: true, info: "Problem reported." };
 }
 
 export async function acceptProbe(requestId: string): Promise<ActionResult> {
