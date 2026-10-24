@@ -106,11 +106,6 @@ export function ProblemForm({
           </Select>
         </div>
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="tags">Tags (comma-separated)</Label>
-        <Input id="tags" name="tags" defaultValue={problem?.tags.join(", ")} placeholder="api, debugging, authentication" />
-      </div>
-
       {error ? <FieldError>{error}</FieldError> : null}
       {info ? (
         <p role="status" className="rounded-md border border-support/50 bg-support-tint px-3 py-2 text-sm text-support-deep">

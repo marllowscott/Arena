@@ -75,10 +75,6 @@ export function ProbeRequestForm({ pathways }: { pathways: PathwayRow[] }) {
           <Input id="probe-technologies" name="technologies" placeholder="TypeScript, Supabase" />
         </div>
         <div>
-          <Label htmlFor="probe-tags">Tags (comma-separated)</Label>
-          <Input id="probe-tags" name="tags" placeholder="auth, RLS" />
-        </div>
-        <div>
           <Label htmlFor="probe-urgency">Urgency</Label>
           <Select id="probe-urgency" name="urgency" defaultValue="normal">
             <option value="normal">Normal</option>
