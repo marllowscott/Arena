@@ -29,7 +29,7 @@ export default async function InstructorDashboardPage() {
   const topicPresentations = submissions.filter(
     (submission) => submission.topic_id !== null,
   );
-  const problemSubmissions = submissions.filter(
+  const assignmentSubmissions = submissions.filter(
     (submission) => submission.challenge_id !== null,
   );
 
@@ -44,8 +44,8 @@ export default async function InstructorDashboardPage() {
       <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Link href="/instructor/review-queue">
           <StatCard
-            label="Problems to review"
-            value={`${problemSubmissions.length}`}
+            label="Assignments to review"
+            value={`${assignmentSubmissions.length}`}
             hint="Solutions waiting for you"
             icon={ListChecks}
             tone="primary"
@@ -79,7 +79,7 @@ export default async function InstructorDashboardPage() {
         </Link>
         <Link href="/instructor/probes">
           <StatCard
-            label="Flagged probes"
+            label="Flagged problem reports"
             value={`${flaggedProbes}`}
             hint="Privacy reports"
             icon={LifeBuoy}
