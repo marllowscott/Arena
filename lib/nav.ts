@@ -36,7 +36,7 @@ export const instructorNav: NavItem[] = [
   { href: "/instructor/challenges", label: "Problems", icon: Target, hint: "Problem catalogue" },
   { href: "/instructor/topics", label: "Topics", icon: Presentation, hint: "Topics and presentations" },
   { href: "/instructor/opportunities", label: "Opportunities", icon: Compass, hint: "Verification" },
-  { href: "/leaderboard", label: "Leaderboard", icon: Trophy, hint: "Where you stand" },
+  { href: "/instructor/leaderboard", label: "Leaderboard", icon: Trophy, hint: "Where they stand" },
   { href: "/instructor/developers", label: "Developers", icon: Users, hint: "Progress" },
   { href: "/instructor/dev-shop", label: "Dev Shop", icon: Store, hint: "Reward requests" },
 ];
