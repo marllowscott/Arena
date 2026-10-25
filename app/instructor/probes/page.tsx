@@ -3,6 +3,7 @@ import { LifeBuoy, Flag } from "lucide-react";
 import { PageHeader } from "@/components/shared/section-heading";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { DeleteReportButton } from "@/components/instructor/delete-report-button";
 import { listHelpRequests } from "@/lib/arena/data";
 import { requireInstructor } from "@/lib/arena/session";
 import { relativeTime } from "@/lib/format";
@@ -75,6 +76,7 @@ export default async function InstructorProbesPage() {
                   ))}
                 </div>
               ) : null}
+              <DeleteReportButton reportId={report.id} />
             </li>
           ))}
         </ul>

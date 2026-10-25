@@ -678,6 +678,24 @@ export async function flagProbe(
   return { ok: true, info: "Reported privately to the instructor." };
 }
 
+export async function deleteProblemReport(requestId: string): Promise<ActionResult> {
+  await requireInstructor();
+  if (!requestId.trim()) return { error: "Unknown report." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("help_requests")
+    .delete()
+    .eq("id", requestId);
+  if (error) {
+    return { error: `Could not delete report (${error.code}): ${error.message}` };
+  }
+
+  revalidatePath("/instructor/probes");
+  revalidatePath("/instructor");
+  return { ok: true, info: "Report deleted." };
+}
+
 export async function moderateProbe(
   requestId: string,
   flagged: boolean,
