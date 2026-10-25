@@ -9,7 +9,7 @@ import {
 import Link from "next/link";
 import { PageHeader } from "@/components/shared/section-heading";
 import { StatCard } from "@/components/shared/stat-card";
-import { flaggedProbeCount, hubActivity, pendingOpportunities, pendingSubmissions } from "@/lib/arena/data";
+import { hubActivity, listHelpRequests, pendingOpportunities, pendingSubmissions } from "@/lib/arena/data";
 import { listManagedDevelopers } from "@/lib/arena/developer-management";
 import { requireInstructor } from "@/lib/arena/session";
 import { formatXp, relativeTime } from "@/lib/format";
@@ -18,12 +18,12 @@ import { nowMs } from "@/lib/arena/clock";
 export default async function InstructorDashboardPage() {
   await requireInstructor();
 
-  const [submissions, opportunities, roster, activity, flaggedProbes] = await Promise.all([
+  const [submissions, opportunities, roster, activity, reportCount] = await Promise.all([
     pendingSubmissions(),
     pendingOpportunities(),
     listManagedDevelopers(),
     hubActivity(10),
-    flaggedProbeCount(),
+    listHelpRequests().then((reports) => reports.length),
   ]);
 
   const topicPresentations = submissions.filter(
@@ -79,9 +79,9 @@ export default async function InstructorDashboardPage() {
         </Link>
         <Link href="/instructor/probes">
           <StatCard
-            label="Flagged problem reports"
-            value={`${flaggedProbes}`}
-            hint="Privacy reports"
+            label="Problem reports"
+            value={`${reportCount}`}
+            hint="Posted by developers"
             icon={LifeBuoy}
             tone="gold"
           />
