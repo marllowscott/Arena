@@ -18,6 +18,8 @@ export interface NavItem {
   icon: LucideIcon;
   /** Shown under the label on wide sidebars. */
   hint: string;
+  /** Optional badge count shown on the right side. */
+  badge?: number;
 }
 
 /** Developer experience: five destinations, one per activity. */
@@ -25,6 +27,7 @@ export const developerNav: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, hint: "What to do next" },
   { href: "/arena", label: "Assignments", icon: ListChecks, hint: "Solve something" },
   { href: "/topics", label: "Topics", icon: Presentation, hint: "Research and present" },
+  { href: "/leaderboard", label: "Leaderboard", icon: Trophy, hint: "Where you stand" },
   { href: "/opportunities", label: "Opportunities", icon: Compass, hint: "Find openings" },
   { href: "/dev-shop", label: "Dev Shop", icon: Store, hint: "Progress unlocks learning" },
   { href: "/probe", label: "Problem reports", icon: LifeBuoy, hint: "What you are stuck on" },

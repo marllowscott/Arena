@@ -917,6 +917,40 @@ export async function notificationsFor(
   return (data ?? []) as NotificationRow[];
 }
 
+export async function unclaimedChallengeCount(userId: string): Promise<number> {
+  const supabase = await createClient();
+  const { data: open } = await supabase
+    .from("challenges")
+    .select("id")
+    .eq("status", "open");
+  const ids = (open ?? []).map((r: { id: string }) => r.id);
+  if (ids.length === 0) return 0;
+  const { data: claims } = await supabase
+    .from("activity_claims")
+    .select("activity_id")
+    .eq("kind", "challenge")
+    .in("activity_id", ids);
+  const claimed = new Set((claims ?? []).map((r: { activity_id: string }) => r.activity_id));
+  return ids.filter((id) => !claimed.has(id)).length;
+}
+
+export async function unclaimedTopicCount(userId: string): Promise<number> {
+  const supabase = await createClient();
+  const { data: open } = await supabase
+    .from("teaching_proposals")
+    .select("id")
+    .eq("status", "open");
+  const ids = (open ?? []).map((r: { id: string }) => r.id);
+  if (ids.length === 0) return 0;
+  const { data: claims } = await supabase
+    .from("activity_claims")
+    .select("activity_id")
+    .eq("kind", "topic")
+    .in("activity_id", ids);
+  const claimed = new Set((claims ?? []).map((r: { activity_id: string }) => r.activity_id));
+  return ids.filter((id) => !claimed.has(id)).length;
+}
+
 export async function unreadCount(userId: string): Promise<number> {
   const supabase = await createClient();
   const { count, error } = await supabase

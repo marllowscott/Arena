@@ -37,11 +37,13 @@ function MobileDrawer({
   onClose,
   items,
   footer,
+  navBadges,
 }: {
   open: boolean;
   onClose: () => void;
   items: NavItem[];
   footer: React.ReactNode;
+  navBadges?: Record<string, number>;
 }) {
   const closeRef = React.useRef<HTMLButtonElement>(null);
 
@@ -93,7 +95,7 @@ function MobileDrawer({
         </div>
 
         <div className="flex-1 px-3 py-4">
-          <NavList items={items} onNavigate={onClose} />
+          <NavList items={items} onNavigate={onClose} badges={navBadges} />
         </div>
 
         <div className="space-y-2 border-t border-ink-700 px-3 py-4">{footer}</div>
@@ -107,11 +109,13 @@ function ShellFrame({
   topBarExtra,
   footer,
   children,
+  navBadges,
 }: {
   items: NavItem[];
   topBarExtra: React.ReactNode;
   footer: React.ReactNode;
   children: React.ReactNode;
+  navBadges?: Record<string, number>;
 }) {
   const pathname = usePathname();
   const [drawer, setDrawer] = React.useState({ path: pathname, open: false });
@@ -136,7 +140,7 @@ function ShellFrame({
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <NavList items={items} collapsed={sidebarState.collapsed} />
+          <NavList items={items} collapsed={sidebarState.collapsed} badges={navBadges} />
         </div>
 
         <div className="space-y-2 pt-4">
@@ -227,11 +231,12 @@ function ShellFrame({
         <main className="min-w-0 flex-1">{children}</main>
       </div>
 
-      <MobileDrawer
+       <MobileDrawer
         open={open}
         onClose={() => setDrawer({ path: pathname, open: false })}
         items={items}
         footer={footer}
+        navBadges={navBadges}
       />
     </div>
   );
@@ -302,15 +307,18 @@ function TopBar({ identity }: { identity: ShellIdentity }) {
 export function DeveloperShell({
   identity,
   children,
+  navBadges,
 }: {
   identity: ShellIdentity;
   children: React.ReactNode;
+  navBadges?: Record<string, number>;
 }) {
   return (
     <ShellFrame
       items={developerNav}
       footer={<IdentityPanel identity={identity} />}
       topBarExtra={<TopBar identity={identity} />}
+      navBadges={navBadges}
     >
       {children}
     </ShellFrame>
@@ -320,9 +328,11 @@ export function DeveloperShell({
 export function InstructorShell({
   identity,
   children,
+  navBadges,
 }: {
   identity: ShellIdentity;
   children: React.ReactNode;
+  navBadges?: Record<string, number>;
 }) {
   return (
     <ShellFrame
@@ -344,6 +354,7 @@ export function InstructorShell({
         </>
       }
       topBarExtra={<TopBar identity={identity} />}
+      navBadges={navBadges}
     >
       {children}
     </ShellFrame>

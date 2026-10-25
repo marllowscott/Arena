@@ -11,6 +11,8 @@ import {
   SubmissionPanel,
 } from "@/components/instructor/review-controls";
 import { FilterLinks } from "@/components/shared/filter-links";
+import { ReviewHistory } from "@/components/instructor/review-history";
+import { XpLedger } from "@/components/instructor/xp-ledger";
 import { SearchField } from "@/components/shared/search-field";
 import { formatXp, relativeTime } from "@/lib/format";
 import { nowMs } from "@/lib/arena/clock";
@@ -159,94 +161,14 @@ export default async function ReviewQueuePage({
         <h2 className="font-display text-lg font-semibold tracking-tight text-ink-900">
           Recent review history
         </h2>
-        {reviewed.length === 0 ? (
-          <p className="mt-3 text-sm text-ink-400">
-            Completed decisions and XP awards will appear here.
-          </p>
-        ) : (
-          <ul className="mt-4 space-y-2">
-            {reviewed.map((submission) => (
-              <li
-                key={submission.id}
-                className="rounded-md border border-sand-300 bg-sand-50 px-4 py-3"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-ink-800">
-                    {submission.developer_name ?? "Unknown developer"}
-                  </span>
-                  <span className="text-sm text-ink-500">
-                    · {submission.challenge_title ?? submission.topic_title}
-                  </span>
-                  <SubmissionStatusBadge status={submission.status} />
-                  {submission.awarded_xp ? (
-                    <span className="font-mono text-xs font-semibold text-primary">
-                      +{formatXp(submission.awarded_xp)} XP
-                    </span>
-                  ) : null}
-                  <time
-                    className="ml-auto font-mono text-[10px] uppercase tracking-[0.1em] text-ink-300"
-                    dateTime={submission.reviewed_at ?? undefined}
-                  >
-                    {submission.reviewed_at
-                      ? relativeTime(submission.reviewed_at, nowMs())
-                      : "Review time unavailable"}
-                  </time>
-                </div>
-                <p className="mt-1 text-xs text-ink-400">
-                  Reviewed by {submission.reviewer_name ?? "unknown instructor"}
-                </p>
-                {submission.reviewer_note ? (
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-ink-600">
-                    {submission.reviewer_note}
-                  </p>
-                ) : null}
-                <SubmissionManagementControls submission={submission} />
-              </li>
-            ))}
-          </ul>
-        )}
+        <ReviewHistory reviewed={reviewed as never} />
       </section>
 
       <section className="mt-12">
         <h2 className="font-display text-lg font-semibold tracking-tight text-ink-900">
           Recent XP ledger
         </h2>
-        {xpEvents.length === 0 ? (
-          <p className="mt-3 text-sm text-ink-400">No XP events have been recorded yet.</p>
-        ) : (
-          <ul className="mt-4 divide-y divide-sand-300 rounded-md border border-sand-300 bg-sand-50">
-            {xpEvents.map((event) => (
-              <li key={event.id} className="flex flex-wrap items-start gap-3 px-4 py-3">
-                <span className="min-w-16 font-mono text-sm font-semibold tabular-nums text-primary">
-                  {event.xp > 0 ? "+" : ""}
-                  {formatXp(event.xp)} XP
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-ink-800">
-                    {event.developer_name ?? "Unknown developer"}
-                    {event.developer_handle ? ` · @${event.developer_handle}` : ""}
-                    <span className="font-normal text-ink-500"> · {event.label}</span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-ink-500">
-                    {event.source} · {event.pathway_id}
-                    {event.detail ? ` · ${event.detail}` : ""}
-                  </p>
-                  {event.reference_id ? (
-                    <p className="mt-0.5 font-mono text-[10px] text-ink-300">
-                      Reference: {event.reference_id}
-                    </p>
-                  ) : null}
-                </div>
-                <time
-                  className="ml-auto font-mono text-[10px] uppercase tracking-[0.1em] text-ink-300"
-                  dateTime={event.created_at}
-                >
-                  {relativeTime(event.created_at, nowMs())}
-                </time>
-              </li>
-            ))}
-          </ul>
-        )}
+        <XpLedger events={xpEvents as never} />
       </section>
 
       <p className="mt-6 text-xs leading-relaxed text-ink-400">

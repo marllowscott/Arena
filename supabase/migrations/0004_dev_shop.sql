@@ -14,37 +14,7 @@ create table public.dev_shop_rewards (
   sort_order integer not null default 0
 );
 
-insert into public.dev_shop_rewards
-  (id, name, category, description, details, points_cost, sort_order)
-values
-  (
-    'workflow-handout',
-    'Workflow handout',
-    'Learning resource',
-    'Request a focused workflow guide or practical handout.',
-    'Tell the instructor what workflow or topic you want help with. They will share a suitable resource.',
-    1,
-    1
-  ),
-  (
-    'group-deep-dive',
-    'Instructor group deep-dive',
-    'Group session',
-    'Request a place in a focused, instructor-led group session.',
-    'Share the topic you want to explore. The instructor will coordinate a session and confirm its time.',
-    4,
-    2
-  ),
-  (
-    'one-to-one-deep-dive',
-    'One-to-one deep-dive',
-    'Individual session',
-    'Request a focused deep-dive session with the instructor.',
-    'Share your topic and availability. The instructor will review the request and coordinate a time.',
-    8,
-    3
-  )
-on conflict (id) do nothing;
+-- (dev shop rewards are managed by the instructor; no seed rewards shipped)
 
 create table public.dev_shop_redemptions (
   id uuid primary key default gen_random_uuid(),

@@ -31,10 +31,12 @@ export function NavList({
   items,
   onNavigate,
   collapsed = false,
+  badges,
 }: {
   items: NavItem[];
   onNavigate?: () => void;
   collapsed?: boolean;
+  badges?: Record<string, number>;
 }) {
   const pathname = usePathname();
 
@@ -75,7 +77,7 @@ export function NavList({
                   aria-hidden
                 />
                 {!collapsed && (
-                  <span className="flex min-w-0 flex-col leading-tight">
+                  <span className="flex min-w-0 flex-1 flex-col leading-tight">
                     <span className="text-sm font-medium">{item.label}</span>
                     <span
                       className={cn(
@@ -87,6 +89,14 @@ export function NavList({
                     </span>
                   </span>
                 )}
+                {!collapsed && (badges?.[item.href] ?? item.badge ?? 0) > 0 ? (
+                  <span
+                    className="ml-auto shrink-0 font-semibold tabular-nums text-red-400"
+                    style={{ fontFamily: '"Amandra Design", var(--font-display, sans-serif)' }}
+                  >
+                    {badges?.[item.href] ?? item.badge}
+                  </span>
+                ) : null}
               </Link>
             </li>
           );

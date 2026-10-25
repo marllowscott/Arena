@@ -2,7 +2,7 @@ import { DeveloperShell } from "@/components/layout/arena-shell";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/arena/actions";
 import { initialsFor, requireDeveloper } from "@/lib/arena/session";
-import { listPathways, unreadCount } from "@/lib/arena/data";
+import { listPathways, unreadCount, unclaimedChallengeCount, unclaimedTopicCount } from "@/lib/arena/data";
 
 export default async function DeveloperLayout({
   children,
@@ -47,9 +47,11 @@ export default async function DeveloperLayout({
     );
   }
 
-  const [unread, pathways] = await Promise.all([
+  const [unread, pathways, unclaimedChallenges, unclaimedTopics] = await Promise.all([
     unreadCount(profile.id).catch(() => 0),
     listPathways(),
+    unclaimedChallengeCount(profile.id).catch(() => 0),
+    unclaimedTopicCount(profile.id).catch(() => 0),
   ]);
   const pathwayName =
     pathways.find((pathway) => pathway.id === profile.primary_pathway)?.short_name ??
@@ -72,6 +74,10 @@ export default async function DeveloperLayout({
         progress: 0,
         xpToNext: 0,
         profileHref: "/leaderboard",
+      }}
+      navBadges={{
+        "/arena": unclaimedChallenges,
+        "/topics": unclaimedTopics,
       }}
     >
       {children}

@@ -1,6 +1,6 @@
 import { InstructorShell } from "@/components/layout/arena-shell";
 import { initialsFor, requireInstructor } from "@/lib/arena/session";
-import { listPathways } from "@/lib/arena/data";
+import { listPathways, pendingSubmissions } from "@/lib/arena/data";
 
 export default async function InstructorLayout({
   children,
@@ -28,7 +28,10 @@ export default async function InstructorLayout({
     );
   }
 
-  const pathways = await listPathways();
+  const [pathways, pending] = await Promise.all([
+    listPathways(),
+    pendingSubmissions().catch(() => []),
+  ]);
   const pathwayName =
     pathways.find((pathway) => pathway.id === profile.primary_pathway)?.short_name ??
     "Instructor";
@@ -49,7 +52,10 @@ export default async function InstructorLayout({
         pathwayName,
         progress: 0,
         xpToNext: 0,
-          profileHref: "/instructor/profile",
+        profileHref: "/instructor/profile",
+      }}
+      navBadges={{
+        "/instructor/review-queue": pending.length,
       }}
     >
       {children}

@@ -1093,8 +1093,8 @@ export async function proposeTopic(formData: FormData): Promise<ActionResult> {
     return { error: "Choose a valid pathway." };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .from("teaching_proposals")
     .insert({
       title,
