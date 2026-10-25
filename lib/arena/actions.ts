@@ -149,6 +149,49 @@ export async function logout(): Promise<void> {
   redirect("/login");
 }
 
+export async function updateProfile(formData: FormData): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const fullName = String(formData.get("fullName") ?? "").trim();
+  const handle = String(formData.get("handle") ?? "").trim();
+  const headline = String(formData.get("headline") ?? "").trim();
+  const focus = String(formData.get("focus") ?? "").trim();
+  const primaryPathway = String(formData.get("primaryPathway") ?? "").trim();
+  const skills = String(formData.get("skills") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!fullName) return { error: "Full name is required." };
+  if (handle && !/^[a-z0-9-]{2,40}$/.test(handle)) {
+    return { error: "Handle must be 2-40 lowercase letters, numbers, or hyphens." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      full_name: fullName,
+      ...(handle ? { handle } : {}),
+      headline,
+      focus,
+      skills,
+      ...(primaryPathway ? { primary_pathway: primaryPathway } : {}),
+    })
+    .eq("id", session.userId);
+
+  if (error) {
+    if (String(error.code) === "23505") {
+      return { error: "That handle is already taken." };
+    }
+    return { error: `Could not update profile (${error.code}): ${error.message}` };
+  }
+
+  revalidatePath("/profile");
+  revalidatePath("/instructor/profile");
+  return { ok: true, info: "Profile updated." };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Instructor-managed developer accounts                                      */
 /* -------------------------------------------------------------------------- */

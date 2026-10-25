@@ -17,6 +17,8 @@ import {
   titlesFor,
 } from "@/lib/arena/progression";
 import { listPathways } from "@/lib/arena/data";
+import { Card } from "@/components/ui/card";
+import { ProfileEditForm } from "@/components/shared/profile-edit-form";
 import { requireDeveloper } from "@/lib/arena/session";
 import { buildPathwayProgress } from "@/lib/progression";
 import type { Pathway, PathwayId } from "@/lib/types";
@@ -79,7 +81,21 @@ export default async function ProfilePage() {
   const pending = submissions.filter((submission) => submission.status === "pending").length;
 
   return (
-    <ProfileView
+    <>
+      <div className="px-4 py-8 sm:px-6">
+        <Card className="mb-6 p-5">
+          <h2 className="font-display text-lg font-semibold tracking-tight text-ink-900">
+            Edit profile
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Update your name, handle, headline, and more.
+          </p>
+          <div className="mt-4">
+            <ProfileEditForm profile={profile} pathways={typedPathways} />
+          </div>
+        </Card>
+      </div>
+      <ProfileView
       profile={profile}
       pathways={typedPathways}
       progress={progress}
@@ -105,5 +121,6 @@ export default async function ProfilePage() {
       }}
       avatarUrl={profile.avatar_url ?? undefined}
     />
+    </>
   );
 }

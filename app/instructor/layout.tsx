@@ -49,7 +49,7 @@ export default async function InstructorLayout({
         pathwayName,
         progress: 0,
         xpToNext: 0,
-        profileHref: "/instructor/developers",
+          profileHref: "/instructor/profile",
       }}
     >
       {children}
