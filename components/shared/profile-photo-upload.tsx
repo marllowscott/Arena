@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ChevronDown, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { deleteProfileImage, uploadProfileImage } from "@/lib/arena/actions";
 import { SignOutButton } from "./sign-out-button";
@@ -10,9 +11,13 @@ import { SignOutButton } from "./sign-out-button";
 export function ProfilePhotoUpload({
   avatarUrl,
   compact = false,
+  trigger,
+  profileHref,
 }: {
   avatarUrl?: string | null;
   compact?: boolean;
+  trigger?: React.ReactNode;
+  profileHref?: string;
 }) {
   const router = useRouter();
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -73,40 +78,55 @@ export function ProfilePhotoUpload({
         aria-label="Choose a profile photo from your device"
       />
       {compact ? (
-        <details ref={menuRef} className="group relative">
-          <summary
-            className="flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-md border border-sand-400 bg-sand-50 px-2 text-xs text-ink-700 transition-colors hover:bg-sand-200 [&::-webkit-details-marker]:hidden"
-            aria-label="Profile photo options"
+      <details ref={menuRef} className="group relative">
+        <summary
+          className="flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-full transition-colors hover:opacity-80 [&::-webkit-details-marker]:hidden"
+          aria-label="Profile options"
+        >
+          {trigger ?? (
+            <>
+              <Camera aria-hidden className="size-3.5" />
+              Photo
+              <ChevronDown aria-hidden className="size-3 transition-transform group-open:rotate-180" />
+            </>
+          )}
+        </summary>
+        <div className="absolute right-0 top-full z-50 mt-1 min-w-44 rounded-md border border-sand-400 bg-sand-50 p-1 shadow-lg">
+          {profileHref ? (
+            <>
+              <Link
+                href={profileHref}
+                className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-xs text-ink-700 hover:bg-sand-200"
+              >
+                View profile
+              </Link>
+              <div className="my-1 border-t border-sand-300" />
+            </>
+          ) : null}
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-xs text-ink-700 hover:bg-sand-200 disabled:opacity-50"
+            onClick={() => inputRef.current?.click()}
+            disabled={pending}
           >
             <Camera aria-hidden className="size-3.5" />
-            Photo
-            <ChevronDown aria-hidden className="size-3 transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="absolute right-0 top-full z-50 mt-1 min-w-40 rounded-md border border-sand-400 bg-sand-50 p-1 shadow-lg">
+            {pending ? "Uploading…" : avatarUrl ? "Change photo" : "Add photo"}
+          </button>
+          {avatarUrl ? (
             <button
               type="button"
               className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-xs text-ink-700 hover:bg-sand-200 disabled:opacity-50"
-              onClick={() => inputRef.current?.click()}
+              onClick={remove}
               disabled={pending}
             >
-              <Camera aria-hidden className="size-3.5" />
-              {pending ? "Uploading…" : avatarUrl ? "Change photo" : "Add photo"}
+              <Trash2 aria-hidden className="size-3.5" />
+              Remove photo
             </button>
-            {avatarUrl ? (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-xs text-ink-700 hover:bg-sand-200 disabled:opacity-50"
-                onClick={remove}
-                disabled={pending}
-              >
-                <Trash2 aria-hidden className="size-3.5" />
-                Remove photo
-              </button>
-            ) : null}
-            <div className="my-1 border-t border-sand-300" />
-            <SignOutButton variant="menu" />
-          </div>
-        </details>
+          ) : null}
+          <div className="my-1 border-t border-sand-300" />
+          <SignOutButton variant="menu" />
+        </div>
+      </details>
       ) : (
         <>
           <Button

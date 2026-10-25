@@ -256,27 +256,28 @@ function TopBar({ identity }: { identity: ShellIdentity }) {
   const level = levelForXp(identity.totalXp);
   return (
     <>
-      <Link
-        href={identity.profileHref}
-        className="flex items-center gap-2.5 rounded-md py-1 pl-1 pr-2 transition-colors hover:bg-sand-200/70"
-      >
-        <Avatar
-          initials={identity.initials}
-          name={identity.name}
-          from={identity.avatarFrom}
-          to={identity.avatarTo}
-          size="sm"
-          src={identity.avatarUrl}
-        />
-        <div className="hidden min-w-0 sm:block">
-          <div className="truncate text-xs font-medium text-ink-800">{identity.name}</div>
-          <div className="truncate font-mono text-[9px] uppercase tracking-[0.12em] text-ink-400">
-            Level {level.level} · {identity.pathwayName}
-          </div>
-        </div>
-      </Link>
+      <ProfilePhotoUpload
+        avatarUrl={identity.avatarUrl}
+        compact
+        profileHref={identity.profileHref}
+        trigger={
+          <Avatar
+            initials={identity.initials}
+            name={identity.name}
+            from={identity.avatarFrom}
+            to={identity.avatarTo}
+            size="sm"
+            src={identity.avatarUrl}
+          />
+        }
+      />
 
-      <ProfilePhotoUpload avatarUrl={identity.avatarUrl} compact />
+      <div className="hidden min-w-0 sm:block">
+        <div className="truncate text-xs font-medium text-ink-800">{identity.name}</div>
+        <div className="truncate font-mono text-[9px] uppercase tracking-[0.12em] text-ink-400">
+          Level {level.level} · {identity.pathwayName}
+        </div>
+      </div>
 
       <div className="hidden items-center rounded-md border border-sand-400 bg-sand-50 px-3 py-1.5 sm:flex">
         <div className="text-right">
