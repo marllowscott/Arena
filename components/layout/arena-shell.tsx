@@ -7,7 +7,6 @@ import { Menu, ShieldCheck, UserRound, X, ChevronLeft, ChevronRight, GripVertica
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { BrandMark, NavList, SwitchAreaLink } from "./sidebar-parts";
-import { formatXp } from "@/lib/format";
 import { levelForXp } from "@/lib/progression";
 import { developerNav, instructorNav, isActivePath, type NavItem } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -281,17 +280,6 @@ function TopBar({ identity, showUnreadBadge = true }: { identity: ShellIdentity;
         <div className="truncate text-xs font-medium text-ink-800">{identity.name}</div>
         <div className="truncate font-mono text-[9px] uppercase tracking-[0.12em] text-ink-400">
           Level {level.level} · {identity.pathwayName}
-        </div>
-      </div>
-
-      <div className="hidden items-center rounded-md border border-sand-400 bg-sand-50 px-3 py-1.5 sm:flex">
-        <div className="text-right">
-          <div className="font-display text-sm font-bold leading-none tabular-nums text-primary">
-            {formatXp(identity.totalXp)}
-          </div>
-          <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-ink-300">
-            XP{identity.weeklyXp > 0 ? ` · +${formatXp(identity.weeklyXp)} wk` : ""}
-          </div>
         </div>
       </div>
 
