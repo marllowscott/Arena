@@ -157,8 +157,8 @@ async function TopicCard({
   hasVoted: boolean;
 }) {
   const [claimRow, claimRows] = await Promise.all([
-    myClaim("topic", topic.id, userId),
-    claimsFor("topic", topic.id),
+    myClaim("topic", topic.id, userId).catch(() => null),
+    claimsFor("topic", topic.id).catch(() => []),
   ]);
   const claimed = claimRow !== null;
   const myPresentation = mySubmissions.find(
