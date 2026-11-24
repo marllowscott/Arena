@@ -48,7 +48,40 @@ export async function listManagedDevelopers(): Promise<ManagedDeveloper[]> {
     )
     .eq("role", "developer")
     .order("full_name", { ascending: true });
-  if (error) throw new Error(`Could not load developer profiles: ${error.message}`);
+  if (error) {
+    /* The role column may not exist yet if migration 0007 hasn't been applied.
+       Fall back to loading all profiles without the role filter. */
+    const { data: fallback, error: fallbackError } = await supabase
+      .from("profiles")
+      .select(
+        "id, handle, full_name, headline, primary_pathway, total_xp, weekly_xp, streak_days, avatar_from, avatar_to, avatar_url, created_at, last_active_at, role",
+      )
+      .order("full_name", { ascending: true });
+    if (fallbackError) throw fallbackError;
+    const allProfiles = (fallback ?? []) as Array<{ id: string; [key: string]: unknown }>;
+    const emailsById = new Map(users.map((user) => [user.id, user.email]));
+    return allProfiles.flatMap((profile) => {
+      const email = emailsById.get(profile.id);
+      if (!email) return [];
+      const developer: ManagedDeveloper = {
+        id: profile.id,
+        email,
+        handle: profile.handle as string,
+        full_name: profile.full_name as string,
+        headline: profile.headline as string,
+        primary_pathway: (profile.primary_pathway ?? "builder") as PathwayId,
+        total_xp: Number(profile.total_xp ?? 0),
+        weekly_xp: Number(profile.weekly_xp ?? 0),
+        streak_days: Number(profile.streak_days ?? 0),
+        avatar_from: profile.avatar_from as string,
+        avatar_to: profile.avatar_to as string,
+        avatar_url: (profile.avatar_url as string) ?? null,
+        created_at: profile.created_at as string,
+        last_active_at: profile.last_active_at as string,
+      };
+      return [developer];
+    });
+  }
 
   const emailsById = new Map(users.map((user) => [user.id, user.email]));
   return (profiles ?? [])

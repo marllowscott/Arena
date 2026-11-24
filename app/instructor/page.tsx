@@ -9,8 +9,8 @@ import {
 import Link from "next/link";
 import { PageHeader } from "@/components/shared/section-heading";
 import { StatCard } from "@/components/shared/stat-card";
-import { hubActivity, listHelpRequests, pendingOpportunities, pendingSubmissions } from "@/lib/arena/data";
-import { listManagedDevelopers } from "@/lib/arena/developer-management";
+import { hubActivity, listHelpRequests, pendingOpportunities, pendingSubmissions, type SubmissionRow, type OpportunityRow, type ActivityRow } from "@/lib/arena/data";
+import { listManagedDevelopers, type ManagedDeveloper } from "@/lib/arena/developer-management";
 import { requireInstructor } from "@/lib/arena/session";
 import { formatXp, relativeTime } from "@/lib/format";
 import { nowMs } from "@/lib/arena/clock";
@@ -19,11 +19,11 @@ export default async function InstructorDashboardPage() {
   await requireInstructor();
 
   const [submissions, opportunities, roster, activity, reportCount] = await Promise.all([
-    pendingSubmissions(),
-    pendingOpportunities(),
-    listManagedDevelopers(),
-    hubActivity(10),
-    listHelpRequests().then((reports) => reports.length),
+    pendingSubmissions().catch(() => [] as SubmissionRow[]),
+    pendingOpportunities().catch(() => [] as OpportunityRow[]),
+    listManagedDevelopers().catch(() => [] as ManagedDeveloper[]),
+    hubActivity(10).catch(() => [] as ActivityRow[]),
+    listHelpRequests().then((reports) => reports.length).catch(() => 0),
   ]);
 
   const topicPresentations = submissions.filter(
