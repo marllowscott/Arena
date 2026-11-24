@@ -8,9 +8,10 @@ import { ClaimButton } from "@/components/arena/claim-button";
 import { SubmissionStatusBadge } from "@/components/arena/status-badge";
 import { FilterLinks } from "@/components/shared/filter-links";
 import { SearchField } from "@/components/shared/search-field";
-import { listOpenChallenges, myClaims, mySubmissions, listPathways } from "@/lib/arena/data";
+import { listOpenChallenges, myClaims, mySubmissions, listPathways, allClaims } from "@/lib/arena/data";
 import { requireDeveloper } from "@/lib/arena/session";
 import Link from "next/link";
+import type { BoardClaimRow } from "@/lib/arena/data";
 
 export const metadata: Metadata = {
   title: "Problems",
@@ -28,12 +29,17 @@ export default async function ArenaPage({
   const profile = session.profile!;
   const params = await searchParams;
 
-  const [challenges, claimIds, submissions, pathways] = await Promise.all([
+  const [challenges, claimIds, submissions, pathways, allChallengeClaims] = await Promise.all([
     listOpenChallenges(),
     myClaims("challenge", profile.id),
     mySubmissions(profile.id),
     listPathways(),
+    allClaims().catch(() => [] as BoardClaimRow[]),
   ]);
+
+  const claimedByAnyone = new Set(
+    allChallengeClaims.filter((c) => c.kind === "challenge").map((c) => c.activity_id),
+  );
 
   const pathwayName = (id: string) =>
     pathways.find((pathway) => pathway.id === id)?.short_name ?? id;
@@ -48,6 +54,8 @@ export default async function ArenaPage({
     const mine = submissions.some(
       (submission) => submission.challenge_id === challenge.id,
     );
+    // Hide items claimed by another developer
+    if (claimedByAnyone.has(challenge.id) && !claimed) return false;
     if (workFilter === "unclaimed" && (claimed || mine)) return false;
     if (workFilter === "claimed" && !claimed) return false;
     if (workFilter === "submitted" && !mine) return false;
@@ -78,11 +86,11 @@ export default async function ArenaPage({
             : "Submitted",
     count:
       value === "all"
-        ? challenges.length
+        ? challenges.filter((c) => !claimedByAnyone.has(c.id) || claimIds.includes(c.id)).length
         : value === "unclaimed"
           ? challenges.filter(
               (challenge) =>
-                !claimIds.includes(challenge.id) &&
+                !claimedByAnyone.has(challenge.id) &&
                 !submissions.some((submission) => submission.challenge_id === challenge.id),
             ).length
           : value === "claimed"

@@ -18,11 +18,13 @@ import {
   listPathways,
   listTopics,
   myClaim,
+  myClaims,
   mySubmissions,
+  allClaims,
 } from "@/lib/arena/data";
 import { listProposalVotes } from "@/lib/arena/progression";
 import { requireDeveloper } from "@/lib/arena/session";
-import type { PathwayRow, SubmissionRow, TopicRow } from "@/lib/arena/data";
+import type { BoardClaimRow, PathwayRow, SubmissionRow, TopicRow } from "@/lib/arena/data";
 import type { ProposalVoteRow } from "@/lib/arena/progression";
 
 export const metadata: Metadata = {
@@ -59,12 +61,26 @@ export default async function TopicsPage({
 
   const params = await searchParams;
 
-  const [topics, pathways, mySubs, votes] = await Promise.all([
+  const [topics, pathways, mySubs, votes, allTopicClaims, myTopicClaims]: [
+    TopicRow[],
+    PathwayRow[],
+    SubmissionRow[],
+    ProposalVoteRow[],
+    BoardClaimRow[],
+    string[],
+  ] = await Promise.all([
     listTopics().catch(() => [] as TopicRow[]),
     listPathways().catch(() => [] as PathwayRow[]),
     mySubmissions(profile.id).catch(() => [] as SubmissionRow[]),
     listProposalVotes().catch(() => [] as ProposalVoteRow[]),
+    allClaims().catch(() => [] as BoardClaimRow[]),
+    myClaims("topic", profile.id).catch(() => [] as string[]),
   ]);
+
+  const claimedByAnyone = new Set(
+    allTopicClaims.filter((c: BoardClaimRow) => c.kind === "topic").map((c: BoardClaimRow) => c.activity_id),
+  );
+  const myClaimIds = new Set(myTopicClaims);
 
   const interest = new Map<string, number>();
   const myVotes = new Set<string>();
@@ -80,6 +96,8 @@ export default async function TopicsPage({
   const filter = Array.isArray(params.filter) ? params.filter[0] : params.filter ?? "all";
 
   const visible = topics.filter((topic) => {
+    // Hide topics claimed by another developer
+    if (claimedByAnyone.has(topic.id) && !myClaimIds.has(topic.id)) return false;
     if (filter !== "all" && topic.status !== filter) return false;
     if (!query) return true;
     return `${topic.title} ${topic.summary}`.toLowerCase().includes(query);
@@ -90,8 +108,8 @@ export default async function TopicsPage({
     label: value === "all" ? "All" : value,
     count:
       value === "all"
-        ? topics.length
-        : topics.filter((topic) => topic.status === value).length,
+        ? visible.length
+        : visible.filter((topic) => topic.status === value).length,
   }));
 
   return (
