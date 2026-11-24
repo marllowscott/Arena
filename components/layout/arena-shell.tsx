@@ -257,7 +257,7 @@ function IdentityPanel({ identity }: { identity: ShellIdentity }) {
   );
 }
 
-function TopBar({ identity }: { identity: ShellIdentity }) {
+function TopBar({ identity, showUnreadBadge = true }: { identity: ShellIdentity; showUnreadBadge?: boolean }) {
   const level = levelForXp(identity.totalXp);
   return (
     <>
@@ -295,7 +295,7 @@ function TopBar({ identity }: { identity: ShellIdentity }) {
         </div>
       </div>
 
-      {identity.unreadCount > 0 ? (
+      {showUnreadBadge && identity.unreadCount > 0 ? (
         <Badge tone="primary" className="hidden md:inline-flex">
           {identity.unreadCount} new
         </Badge>
@@ -317,7 +317,7 @@ export function DeveloperShell({
     <ShellFrame
       items={developerNav}
       footer={<IdentityPanel identity={identity} />}
-      topBarExtra={<TopBar identity={identity} />}
+      topBarExtra={<TopBar identity={identity} showUnreadBadge={false} />}
       navBadges={navBadges}
     >
       {children}
