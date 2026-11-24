@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/arena/actions";
 import { initialsFor, requireDeveloper } from "@/lib/arena/session";
 import { listPathways, unreadCount, unclaimedChallengeCount, unclaimedTopicCount } from "@/lib/arena/data";
+import type { PathwayRow } from "@/lib/arena/data";
 
 export default async function DeveloperLayout({
   children,
@@ -49,7 +50,7 @@ export default async function DeveloperLayout({
 
   const [unread, pathways, unclaimedChallenges, unclaimedTopics] = await Promise.all([
     unreadCount(profile.id).catch(() => 0),
-    listPathways(),
+    listPathways().catch(() => [] as PathwayRow[]),
     unclaimedChallengeCount(profile.id).catch(() => 0),
     unclaimedTopicCount(profile.id).catch(() => 0),
   ]);

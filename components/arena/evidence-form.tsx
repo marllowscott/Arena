@@ -45,6 +45,8 @@ export function EvidenceForm({
       if (result.error) setError(result.error);
       if (result.info) setInfo(result.info);
       if (result.ok) router.refresh();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Submission failed.");
     } finally {
       setPending(false);
     }

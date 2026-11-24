@@ -22,7 +22,8 @@ import {
 } from "@/lib/arena/data";
 import { listProposalVotes } from "@/lib/arena/progression";
 import { requireDeveloper } from "@/lib/arena/session";
-import type { SubmissionRow, TopicRow } from "@/lib/arena/data";
+import type { PathwayRow, SubmissionRow, TopicRow } from "@/lib/arena/data";
+import type { ProposalVoteRow } from "@/lib/arena/progression";
 
 export const metadata: Metadata = {
   title: "Topics",
@@ -41,10 +42,10 @@ export default async function TopicsPage({
   const params = await searchParams;
 
   const [topics, pathways, mySubs, votes] = await Promise.all([
-    listTopics(),
-    listPathways(),
-    mySubmissions(profile.id),
-    listProposalVotes(),
+    listTopics().catch(() => [] as TopicRow[]),
+    listPathways().catch(() => [] as PathwayRow[]),
+    mySubmissions(profile.id).catch(() => [] as SubmissionRow[]),
+    listProposalVotes().catch(() => [] as ProposalVoteRow[]),
   ]);
 
   const interest = new Map<string, number>();

@@ -27,6 +27,8 @@ export function TopicProposalForm({ pathways }: { pathways: PathwayRow[] }) {
         router.refresh();
         formRef.current?.reset();
       }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Submission failed.");
     } finally {
       setPending(false);
     }
