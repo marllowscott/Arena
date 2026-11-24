@@ -38,7 +38,25 @@ export default async function TopicsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await requireDeveloper();
-  const profile = session.profile!;
+  const profile = session.profile;
+
+  if (!profile) {
+    return (
+      <div className="px-4 py-8 sm:px-6 flex min-h-dvh items-center justify-center">
+        <div className="max-w-md rounded-lg border border-primary-line bg-primary-tint p-6">
+          <h1 className="font-display text-lg font-semibold text-primary">
+            Profile not found
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-ink-600">
+            You are signed in, but no profile row matched this user ID. Apply
+            <code className="font-mono text-xs">supabase/migrations/0003_mvp_authorization.sql</code>
+            in the Supabase SQL Editor, then sign out and back in.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const params = await searchParams;
 
   const [topics, pathways, mySubs, votes] = await Promise.all([
