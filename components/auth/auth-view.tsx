@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
-import { ArrowRight, Building2, Target, Trophy } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, PasswordInput } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -31,10 +30,6 @@ export function AuthView() {
       }
       router.refresh();
     } catch (error) {
-      /* redirect() inside a server action throws an error carrying a
-         framework digest. That error IS the successful navigation —
-         re-throw it so the router performs the redirect instead of
-         reporting a failure. */
       if (
         error &&
         typeof error === "object" &&
@@ -58,41 +53,6 @@ export function AuthView() {
   return (
     <div className="min-h-dvh bg-sand-100">
       <div className="mx-auto w-full max-w-xl px-6 py-12 sm:py-20">
-        <header className="text-center">
-          <Image
-            src="/logo.svg"
-            alt=""
-            width={48}
-            height={48}
-            className="mx-auto size-12"
-          />
-          <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
-            Dev Arena
-          </h1>
-          <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-ink-500">
-            Solve real problems, present topics, and find opportunities.
-            XP is awarded when the instructor approves your work.
-          </p>
-        </header>
-
-        <ol className="mt-8 grid gap-3 sm:grid-cols-3">
-          {[
-            { icon: Target, label: "Pick a problem", body: "Claim it, solve it." },
-            { icon: Trophy, label: "Submit evidence", body: "The instructor reviews." },
-            { icon: Building2, label: "Earn XP", body: "Approval pays, never a tap." },
-          ].map((step) => (
-            <li key={step.label} className="rounded-md border border-sand-400 bg-sand-50 p-4">
-              <div className="flex items-center gap-2 text-primary">
-                <step.icon className="size-4" aria-hidden />
-                <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
-                  {step.label}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-ink-400">{step.body}</p>
-            </li>
-          ))}
-        </ol>
-
         <section className="mt-10 rounded-lg border border-sand-300 bg-sand-50 p-6 shadow-subtle sm:p-8">
           <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Authentication mode">
             {(["login", "signup"] as const).map((candidate) => (
